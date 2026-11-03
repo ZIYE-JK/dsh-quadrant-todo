@@ -1,9 +1,13 @@
 /** Host half of the todo bundle: data file, HTTP route, agent tool, notification scheduler. */
 
+import { dirname, join } from 'node:path'
+
 import { createStore, resolveDataFile } from './lib/store.js'
 import { createApi } from './lib/api.js'
 import { createTool } from './lib/tool.js'
 import { createNotifier } from './lib/notify.js'
+import { createHolidayService } from './lib/holidays.js'
+import { setWorkdayTables } from './lib/repeat.js'
 
 // 注意：不要在这里加 'dshIm' —— 那是可选的飞书投递服务，写进 inject 会让没有 dsh-im 的宿主
 // 直接起不来。用 ctx.get('dshIm') 惰性取，取不到就只关掉飞书通道。
@@ -41,8 +45,9 @@ export function apply(ctx, config = {}) {
   // config.dataPath: 可选，覆盖默认数据文件（默认 %DSH_PROFILE_DIR%/data/dsh-todolist/todos.json）。
   // config.staleDays: 超过多少天未完成的待办算「积压」，默认 7 天。
   // config.notifyIntervalMs: 通知巡检间隔，默认 30 秒。
+  const dataFile = resolveDataFile(config.dataPath)
   const store = createStore({
-    file: resolveDataFile(config.dataPath),
+    file: dataFile,
     staleDays: Number.isInteger(config.staleDays) ? config.staleDays : 7,
   })
   const ready = store.load()
@@ -54,7 +59,15 @@ export function apply(ctx, config = {}) {
     logger: console,
     intervalMs: Number.isInteger(config.notifyIntervalMs) ? config.notifyIntervalMs : 30000,
   })
-  const api = createApi(store, notifier)
+
+  // 法定工作日：抓取 → 缓存 → 注入给 repeat.js。抓不到就退回周末规则，绝不影响待办本身。
+  const holidays = createHolidayService({
+    file: join(dirname(dataFile), 'holidays.json'),
+    logger: console,
+    fetchImpl: typeof config.fetchImpl === 'function' ? config.fetchImpl : undefined,
+  })
+
+  const api = createApi(store, notifier, holidays)
 
   // 迁移只在进程首次 load 时发生一次；记一条日志，便于事后核对数据是怎么被改的。
   void ready.then((res) => {
@@ -107,6 +120,25 @@ export function apply(ctx, config = {}) {
     void ready.then(() => notifier.start()).catch(() => {})
     return () => notifier.stop()
   }, 'dsh-sidebar-todo: notify')
+
+  ctx.effect(() => {
+    const cycle = async () => {
+      try {
+        // 顺序要紧：先把缓存换上（离线也立刻可用），再按需抓取，抓到了再换一次。
+        await holidays.load()
+        setWorkdayTables(holidays.tables())
+        await holidays.ensure()
+        setWorkdayTables(holidays.tables())
+      } catch (err) {
+        console.warn('[dsh-sidebar-todo] 法定工作日更新失败（继续用已有数据）：', err?.message ?? err)
+      }
+    }
+    void cycle()
+    // 每小时看一眼足够：真正的抓取一年只有一两次（当年缺失时一次、12 月首个工作日一次）。
+    const timer = setInterval(cycle, 3600000)
+    if (typeof timer.unref === 'function') timer.unref()
+    return () => clearInterval(timer)
+  }, 'dsh-sidebar-todo: workdays')
 
   ctx.effect(() => () => { void store.close() }, 'dsh-sidebar-todo: store')
 }
