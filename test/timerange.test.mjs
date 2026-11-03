@@ -86,16 +86,17 @@ test('v2 -> v3 migration adds null blocks and sanitizes bad values', async () =>
   const { store, file } = await make(v2)
   const res = await store.load()
   assert.equal(res.migrated.from, 2)
-  assert.equal(res.migrated.to, 3)
+  assert.equal(res.migrated.to, 4)
   const byId = Object.fromEntries((await store.list({})).items.map((t) => [t.id, t]))
-  assert.equal(byId.a.startTime, null, 'missing block becomes null')
+  assert.equal(byId.a.startTime, '11:00', 'a v2 row with only dueTime gets it folded into startTime')
+  assert.equal(byId.a.endTime, null)
   assert.equal(byId.b.startTime, null, 'malformed time is cleared')
   assert.equal(byId.b.endTime, null)
   assert.equal(byId.c.endTime, null, 'reversed range drops the end, keeps the start')
   assert.equal(byId.c.startTime, '15:00')
   const written = JSON.parse(await readFile(file, 'utf8'))
-  assert.equal(written.version, 3)
-  assert.equal(byId.a.dueTime, '11:00', 'existing dueTime untouched')
+  assert.equal(written.version, 4)
+  assert.equal(byId.a.dueTime, null, 'v4 folds dueTime into startTime and stops storing it')
 })
 
 test('occurrences feed carries the block for the week view', async () => {
@@ -121,15 +122,17 @@ test('a recurring task expands every occurrence with its block', async () => {
 })
 
 test('notifications fire at the block start, not the deadline', async () => {
-  const item = { id: 't1', title: '排期任务', dueDate: '2026-11-03', dueTime: '18:00', startTime: '08:00', bucket: 'today' }
+  const item = { id: 't1', title: '排期任务', dueDate: '2026-11-03', startTime: '08:00', endTime: '18:00', bucket: 'today' }
   const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
   assert.equal(collectDue([item], at(7, 59), NOTIFY).length, 0)
-  assert.equal(collectDue([item], at(8, 0), NOTIFY).length, 1, 'fires at 08:00 (block start)')
+  const fired = collectDue([item], at(8, 0), NOTIFY)
+  assert.equal(fired.length, 1, 'fires at 08:00 (block start)')
+  assert.equal(fired[0].kind, 'due')
 })
 
-test('with no block it still falls back to dueTime', async () => {
-  const item = { id: 't1', title: 'x', dueDate: '2026-11-03', dueTime: '18:00', startTime: null, bucket: 'today' }
+test('with no time at all it falls back to 09:00 that day', async () => {
+  const item = { id: 't1', title: 'x', dueDate: '2026-11-03', startTime: null, endTime: null, bucket: 'today' }
   const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
-  assert.equal(collectDue([item], at(17, 59), NOTIFY).length, 0)
-  assert.equal(collectDue([item], at(18, 0), NOTIFY).length, 1)
+  assert.equal(collectDue([item], at(8, 59), NOTIFY).length, 0)
+  assert.equal(collectDue([item], at(9, 0), NOTIFY).length, 1)
 })

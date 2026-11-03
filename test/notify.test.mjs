@@ -10,7 +10,7 @@ import { createNotifier, collectDue, renderMessage } from '../lib/notify.js'
 import { inQuietHours } from '../lib/settings.js'
 
 const NOTIFY = { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, quietHours: { enabled: false, start: '22:00', end: '08:00' } }
-const item = (over = {}) => ({ id: 't1', title: '交周报', dueDate: '2026-11-03', dueTime: '11:00', bucket: 'today', ...over })
+const item = (over = {}) => ({ id: 't1', title: '交周报', dueDate: '2026-11-03', startTime: '11:00', bucket: 'today', ...over })
 const at = (y, m, d, hh = 0, mm = 0) => new Date(y, m - 1, d, hh, mm, 0)
 
 // ---------------------------------------------------------------- collectDue
@@ -30,7 +30,7 @@ test('leadMinutes brings the trigger forward', () => {
 })
 
 test('a date with no time defaults to 09:00 that day', () => {
-  const t = item({ dueTime: null })
+  const t = item({ startTime: null })
   assert.equal(collectDue([t], at(2026, 11, 3, 8, 59), NOTIFY).length, 0)
   assert.equal(collectDue([t], at(2026, 11, 3, 9, 0), NOTIFY).length, 1)
 })
@@ -45,10 +45,19 @@ test('past due reports overdue once a day, and never also reports due', () => {
   assert.equal(collectDue([t], at(2026, 11, 4, 9, 0), NOTIFY)[0].key, 't1|2026-11-04|overdue')
 })
 
-test('overdue waits until 09:00 and honours overdueDaily=false', () => {
-  const t = item({ dueDate: '2026-11-01', bucket: 'overdue' })
-  assert.equal(collectDue([t], at(2026, 11, 3, 8, 59), NOTIFY).length, 0)
+test('past-due point tasks nag at any hour; overdueDaily=false silences them', () => {
+  // 逾期时刻现在由任务自己的时间决定，不再有固定的 09:00 闸门。
+  const t = item({ dueDate: '2026-11-01', bucket: 'overdue', startTime: '11:00' })
+  assert.equal(collectDue([t], at(2026, 11, 3, 8, 0), NOTIFY).length, 1, 'no 09:00 gate any more')
   assert.equal(collectDue([t], at(2026, 11, 3, 12, 0), { ...NOTIFY, overdueDaily: false }).length, 0)
+})
+
+test('a point task is not overdue on its own due day', () => {
+  // 否则「到期」和「逾期」会在同一分钟一起响。
+  const t = item({ dueDate: '2026-11-03', startTime: '11:00', bucket: 'today' })
+  const events = collectDue([t], at(2026, 11, 3, 11, 30), NOTIFY)
+  assert.equal(events.length, 1)
+  assert.equal(events[0].kind, 'due')
 })
 
 test('done items and undated items never fire', () => {

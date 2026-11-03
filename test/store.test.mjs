@@ -43,7 +43,7 @@ test('v1 -> v3: legacy quadrant name in category moves to quadrant', async () =>
   const res = await store.load()
   assert.equal(res.corrupt, false)
   assert.equal(res.migrated.from, 1)
-  assert.equal(res.migrated.to, 3)
+  assert.equal(res.migrated.to, 4)
   assert.equal(res.migrated.movedQuadrants, 1)
 
   const { items } = await store.list({ view: 'open' })
@@ -52,14 +52,15 @@ test('v1 -> v3: legacy quadrant name in category moves to quadrant', async () =>
   assert.equal(items[0].category, null, 'legacy category name is cleared')
   assert.deepEqual(items[0].subtasks, [])
   assert.equal(items[0].title, '跟磊哥过一下经营分析框架', 'Chinese title survives migration')
-  assert.equal(items[0].dueTime, '11:00')
+  assert.equal(items[0].startTime, '11:00', 'legacy dueTime is folded into startTime')
+  assert.equal(items[0].dueTime, null, 'dueTime is no longer stored')
 })
 
 test('v1 -> v3: writes back the current version and keeps a v1 backup', async () => {
   const { store, file } = await freshStore(V1)
   await store.load()
   const written = JSON.parse(await readFile(file, 'utf8'))
-  assert.equal(written.version, 3)
+  assert.equal(written.version, 4)
   assert.deepEqual(written.settings.notify.quietHours, { enabled: false, start: '22:00', end: '08:00' })
   assert.deepEqual(written.categories, {})
   const dir = file.replace(/[\\/]todos\.json$/, '')
@@ -70,7 +71,7 @@ test('v1 -> v3: writes back the current version and keeps a v1 backup', async ()
 })
 
 test('a current-version document loads without a migration record', async () => {
-  const { store } = await freshStore({ version: 3, todos: [], categories: {}, settings: {} })
+  const { store } = await freshStore({ version: 4, todos: [], categories: {}, settings: {} })
   const res = await store.load()
   assert.equal(res.migrated, null)
 })

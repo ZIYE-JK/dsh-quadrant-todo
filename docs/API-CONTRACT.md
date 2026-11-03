@@ -1,9 +1,45 @@
-# v3 数据模型与 API 契约
+# v4 数据模型与 API 契约
 
 > 分支 `feat/matrix-ui-notify`。宿主端与客户端共同遵守本文件。
 > 传输不变：`POST /todo/api/<method>`，请求体 JSON，响应 `{ok:true,result}` / `{ok:false,error:{code,message}}`。
 
 ---
+
+## 0a. v4 相对 v3 的增量（时间单一化 / 完成期限 / 超期处理）
+
+### 「时间」只剩一个事实源
+`dueTime` **废弃**，不再落库。`startTime` 是唯一来源：
+
+| 模式 | 字段 | 含义 |
+|---|---|---|
+| 时间点 | `startTime` | 开始时刻 = 时限时刻 = 这个点 |
+| 时间段 | `startTime` + `endTime` | 开始 = `startTime`；时限 = `endTime` |
+
+- UI 上「时间」选择器内有一个 **时间点 / 时间段** 切换；切到时间段才出现结束时间。
+- `create` / `update` 仍**接受** `dueTime` 作为 `startTime` 的别名（agent 老调用不破），但一律折叠进 `startTime`。
+- 逾期判定：`endTime` 存在时，过了 `endTime` 即为逾期（当天也算）；只给时间点时，从次日算起（避免与同一分钟的「到期」重复）。
+- 到期提醒时刻 = `startTime ?? 当天 09:00`。
+
+### 新增字段
+
+| 字段 | 取值 | 说明 |
+|---|---|---|
+| `duePreset` | `today` \| `this_week` \| `this_work_week` \| `custom` \| null | 完成期限选了哪一种；真正的日期仍写在 `dueDate` |
+| `onOverdue` | `none` \| `abandon` | 超过期限未完成：无操作 / 标记为放弃（默认 `none`） |
+| `abandoned` | boolean | 已放弃。仍然**留在列表里**可见、可撤销，但不再催办 |
+| `abandonedAt` | iso \| null | |
+
+### 新增重复类型
+`repeat.freq` 扩展为：`daily` / `weekly` / `monthly` / `yearly` / `ebbinghaus` / `workday`
+
+| freq | 规则 |
+|---|---|
+| `yearly` | 每年同月同日（取系列起始日的月/日，可用 `month` + `monthDay` 覆盖） |
+| `ebbinghaus` | 艾宾浩斯复习：自起始日起第 0/1/2/4/7/15/30/60 天 |
+| `workday` | 法定工作日。**当前 = 周一至周五**；真实法定节假日/调休需要一份逐年更新的数据源，本机没有可用库，已在 `lib/repeat.js` 顶部留出 `HOLIDAYS` / `MAKEUP_WORKDAYS` 扩展点 |
+
+### 新增接口
+`setAbandoned` `{id, abandoned?}` → 行；agent 工具新增 `action: 'abandon'`
 
 ## 0. v3 相对 v2 的增量（周视图 + 可改时间）
 
