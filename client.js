@@ -76,7 +76,6 @@ window.__ModuleLoader__.load({
         selectCategory: '选择分类', selectQuadrant: '选择象限', selectRepeat: '选择重复规则',
         addTodo: '新建待办', calendarIcon: '日历', active: '当前',
         subtaskDelete: '删除子计划', subtaskDone: '子计划完成', subtaskUndone: '子计划未完成',
-        collapseInbox: '折叠收集箱', expandInbox: '展开收集箱',
         inboxCount: '收集箱 {count}',
         quadrantCount: '{count} 条',
         noTodos: '暂无待办', noSubtasks: '暂无子计划',
@@ -176,7 +175,6 @@ window.__ModuleLoader__.load({
         selectCategory: 'Select category', selectQuadrant: 'Select quadrant', selectRepeat: 'Select repeat',
         addTodo: 'New todo', calendarIcon: 'Calendar', active: 'Active',
         subtaskDelete: 'Delete subtask', subtaskDone: 'Subtask done', subtaskUndone: 'Subtask undone',
-        collapseInbox: 'Collapse inbox', expandInbox: 'Expand inbox',
         inboxCount: 'Inbox {count}',
         quadrantCount: '{count} items',
         noTodos: 'No todos', noSubtasks: 'No subtasks',
@@ -265,12 +263,6 @@ window.__ModuleLoader__.load({
       // Left panel
       leftPanel: { width: 369, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
       panelSection: { padding: '12px 16px', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
-      panelHeader: { display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 8px', borderRadius: 6, cursor: 'pointer' },
-      panelHeaderIcon: { fontSize: 16, flex: 'none' },
-      panelHeaderTitle: { fontSize: 13, fontWeight: 600, flex: 1, minWidth: 0 },
-      panelHeaderCount: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' },
-      panelHeaderArrow: { fontSize: 10, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' },
-      panelHeaderArrowBtn: { flex: 'none', width: 20, height: 20, padding: 0, border: 'none', borderRadius: 4, background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 11, lineHeight: '20px', textAlign: 'center', cursor: 'pointer' },
       // Calendar mini
       miniCalendar: { padding: '8px 12px 12px' },
       calendarHead: { display: 'flex', alignItems: 'center', gap: 4, height: 28, marginBottom: 4 },
@@ -456,7 +448,7 @@ window.__ModuleLoader__.load({
       weekDayStrip: { flex: '1 1 0', minWidth: 0, position: 'relative', borderLeft: '0.5px solid var(--dsw-alias-border-l2)' },
       weekBlock: { position: 'absolute', boxSizing: 'border-box', borderRadius: 4, padding: '2px 4px', fontSize: 10.5, lineHeight: '13px', overflow: 'hidden', cursor: 'pointer', color: 'var(--dsw-alias-label-primary)' },
       // 时间块底部 ~6px 的缩放热区：默认几乎透明，悬停/拖动时才显出一条 grip。
-      weekResize: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, cursor: 'ns-resize', touchAction: 'none' },
+      weekResize: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 9, maxHeight: '40%', cursor: 'ns-resize', touchAction: 'none' },
       weekBlockDragging: { zIndex: 5, boxShadow: 'var(--dsw-elevation-panel)' },
       weekNowLine: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, pointerEvents: 'none', background: 'var(--dsw-alias-state-error-primary)' },
     }
@@ -1752,6 +1744,10 @@ window.__ModuleLoader__.load({
 
       const beginDrag = (item, mode) => (event) => {
         if (event.button !== undefined && event.button !== 0) return
+        // 缩放条是时间块的**子元素**。pointerdown 先命中子元素再冒泡到父块，
+        // 父块挂的是 move 处理器——不拦住冒泡，mode 会立刻被改回 'move'，
+        // 表现就是「只能整体拖动，怎么拉都改不了时长」。
+        if (mode === 'resize') event.stopPropagation?.()
         const target = event.currentTarget
         const id = asText(item.todoId)
         const frozen = frozenRef.current.get(id)
@@ -2198,7 +2194,7 @@ window.__ModuleLoader__.load({
           }, '📅')))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, onToggleInboxCollapse, collapsedInbox, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
       const [selectedDay, setSelectedDay] = useState(null)
       const cells = monthGrid(monthCursor.year, monthCursor.month)
       const monthKey = `${monthCursor.year}-${String(monthCursor.month + 1).padStart(2, '0')}`
@@ -2217,36 +2213,20 @@ window.__ModuleLoader__.load({
       }
 
       return h('div', { style: S.leftPanel },
-        // Inbox header
+        // 收集箱：分组里只有它自己一个成员，原来的「标题 + 唯一成员」等于把同一个词
+        // 写了两遍。合并成一行——既当分组标题，也当筛选项。
         h('div', { style: S.panelSection },
           h('div', {
-            style: S.panelHeader,
+            style: { ...S.categoryRow, ...(activeFilter === '__inbox__' ? S.categoryRowSelected : null) },
             onClick: onInboxFilter,
             role: 'button',
             tabIndex: 0,
             'aria-label': t('inbox'),
             onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onInboxFilter() } },
           },
-          h('span', { style: S.panelHeaderIcon }, '📁'),
-          h('span', { style: S.panelHeaderTitle }, t('inbox')),
-          h('span', { style: S.panelHeaderCount }, String(inboxCount)),
-          h('button', {
-            type: 'button',
-            className: 'td-btn',
-            style: S.panelHeaderArrowBtn,
-            'aria-label': collapsedInbox ? t('expandInbox') : t('collapseInbox'),
-            'aria-expanded': collapsedInbox ? 'false' : 'true',
-            onClick: (e) => { e.stopPropagation(); onToggleInboxCollapse() },
-          }, collapsedInbox ? '▸' : '▾')),
-          collapsedInbox
-            ? null
-            : h('div', {
-                style: { ...S.categoryRow, ...(activeFilter === '__inbox__' ? S.categoryRowSelected : null) },
-                onClick: onInboxFilter,
-              },
-              h('span', { style: S.categoryIcon }, '📥'),
-              h('span', { style: S.categoryName }, t('inbox')),
-              h('span', { style: S.categoryCount }, String(inboxCount)))),
+          h('span', { style: S.categoryIcon }, '📥'),
+          h('span', { style: S.categoryName }, t('inbox')),
+          h('span', { style: S.categoryCount }, String(inboxCount)))),
 
         // Mini calendar
         h('div', { style: S.miniCalendar },
@@ -3124,8 +3104,6 @@ window.__ModuleLoader__.load({
       const [dataVersion, setDataVersion] = useState(0)
       // 左栏选中的具体某一天（再点一次取消），只影响矩阵里显示哪些计划。
       const [dayFilter, setDayFilter] = useState(null)
-      // 收集箱折叠：只隐藏左栏那一行筛选入口，不影响当前选中的筛选。
-      const [collapsedInbox, setCollapsedInbox] = useState(false)
       const [retrying, setRetrying] = useState(false)
 
       const tRef = useRef(t)
@@ -3445,8 +3423,6 @@ window.__ModuleLoader__.load({
             inboxCount: state.inboxCount,
             onNewCategory: () => setCategoryOpen(true),
             onInboxFilter: handleInboxFilter,
-            onToggleInboxCollapse: () => setCollapsedInbox((v) => !v),
-            collapsedInbox,
             monthCursor,
             onMonthChange: handleMonthChange,
             calendarItems,
