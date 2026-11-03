@@ -1,0 +1,38 @@
+{
+  "name": "dsh-sidebar-todo",
+  "version": "0.2.3",
+  "description": "DeepSeek Harness 侧栏待办清单：今天 / 本周 / 逾期 / 积压，支持循环任务、月视图日历与分类，agent 可读写",
+  "type": "module",
+  "license": "MIT",
+  "author": "Natte",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "todo",
+    "todolist",
+    "task",
+    "sidebar"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Natte/dsh-sidebar-todo.git"
+  },
+  "homepage": "https://github.com/Natte/dsh-sidebar-todo#readme",
+  "bugs": {
+    "url": "https://github.com/Natte/dsh-sidebar-todo/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "client.js", "lib/**/*.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "scripts": { "test": "node --test" },
+  "publishConfig": { "access": "public" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-locale"] }
+  }
+}
