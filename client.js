@@ -85,6 +85,13 @@ window.__ModuleLoader__.load({
         quietStart: '开始', quietEnd: '结束',
         weekdays: '星期', monthDay: '每月几号', until: '结束日期',
         confirm: '确认', add: '添加', delete: '删除',
+        // --- 周视图 / 时间段 ---
+        weekPrefix: '周', weekRange: '{from} – {to}',
+        weekDayFull: '{y}年{m}月{d}日', weekDayShort: '{m}月{d}日', weekDateShort: '{m}/{d}',
+        prevWeek: '上一周', nextWeek: '下一周',
+        allDay: '全天', nowLine: '现在',
+        timeRange: '时间段', timeStart: '开始', timeEnd: '结束',
+        timeRangeInvalid: '结束时间必须晚于开始时间',
       },
       en: {
         nav: 'To-do', title: 'To-do', new: 'New', search: 'Search',
@@ -164,6 +171,13 @@ window.__ModuleLoader__.load({
         quietStart: 'Start', quietEnd: 'End',
         weekdays: 'Weekdays', monthDay: 'Day of month', until: 'Until',
         confirm: 'Confirm', add: 'Add', delete: 'Delete',
+        // --- Week view / time range ---
+        weekPrefix: '', weekRange: '{from} – {to}',
+        weekDayFull: '{m}/{d}/{y}', weekDayShort: '{m}/{d}', weekDateShort: '{m}/{d}',
+        prevWeek: 'Previous week', nextWeek: 'Next week',
+        allDay: 'All day', nowLine: 'Now',
+        timeRange: 'Time range', timeStart: 'Start', timeEnd: 'End',
+        timeRangeInvalid: 'End time must be after start time',
       },
     }
     const ORDER = ['overdue', 'today', 'tomorrow', 'week', 'later', 'stale', 'unplanned', 'done']
@@ -198,6 +212,11 @@ window.__ModuleLoader__.load({
     }
 
     // --- Styling ---
+    // 周视图的几何常量：小时高度、左侧时间轴宽度、星期表头高度。
+    // 表头是 sticky 的，weekAllDayRow 的 top 必须正好等于表头高度，否则会错位。
+    const HOUR_PX = 48
+    const WEEK_GUTTER = 56
+    const WEEK_HEAD_H = 44
     const S = {
       // Main layout
       page: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'var(--dsw-font-family, sans-serif)' },
@@ -368,6 +387,27 @@ window.__ModuleLoader__.load({
       calendarViewDay: { fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' },
       calendarViewItem: { fontSize: 10.5, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--dsw-alias-label-secondary)' },
       calendarViewMore: { fontSize: 10, color: 'var(--dsw-alias-label-tertiary)' },
+      // Week view（周视图：7 列 × 0-24 时段）
+      weekView: { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px 16px', overflow: 'hidden' },
+      weekNav: { display: 'flex', alignItems: 'center', gap: 6, height: 32, marginBottom: 8, flex: 'none' },
+      weekNavTitle: { flex: 1, minWidth: 0, textAlign: 'center', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      weekScroll: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', border: '0.5px solid var(--dsw-alias-border-l2)', borderRadius: 'var(--dsw-radius-md)', background: 'var(--dsw-specific-input-major)' },
+      weekHeadRow: { display: 'flex', position: 'sticky', top: 0, zIndex: 3, height: WEEK_HEAD_H, boxSizing: 'border-box', flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
+      weekAllDayRow: { display: 'flex', position: 'sticky', top: WEEK_HEAD_H, zIndex: 2, boxSizing: 'border-box', flex: 'none', minHeight: 28, background: 'var(--dsw-alias-bg-layer-1)', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
+      weekGutter: { width: WEEK_GUTTER, flex: 'none', boxSizing: 'border-box' },
+      weekAllDayLabel: { width: WEEK_GUTTER, flex: 'none', boxSizing: 'border-box', padding: '4px 6px 0 0', textAlign: 'right', fontSize: 10, lineHeight: '13px', color: 'var(--dsw-alias-label-tertiary)' },
+      weekDayCol: { flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, borderLeft: '0.5px solid var(--dsw-alias-border-l2)' },
+      weekDayName: { fontSize: 11.5, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', lineHeight: '14px' },
+      weekDayDate: { fontSize: 10.5, color: 'var(--dsw-alias-label-tertiary)', lineHeight: '13px' },
+      weekDayToday: { color: 'var(--dsw-alias-state-business-primary)' },
+      weekAllDayCol: { flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, padding: 3, boxSizing: 'border-box', borderLeft: '0.5px solid var(--dsw-alias-border-l2)' },
+      weekChip: { display: 'block', width: '100%', boxSizing: 'border-box', padding: '1px 4px', borderRadius: 4, fontSize: 10.5, lineHeight: '15px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' },
+      weekGrid: { display: 'flex', position: 'relative' },
+      weekHourCol: { width: WEEK_GUTTER, flex: 'none' },
+      weekHourLabel: { height: HOUR_PX, boxSizing: 'border-box', paddingRight: 6, textAlign: 'right', fontSize: 10, lineHeight: '11px', color: 'var(--dsw-alias-label-tertiary)' },
+      weekDayStrip: { flex: '1 1 0', minWidth: 0, position: 'relative', borderLeft: '0.5px solid var(--dsw-alias-border-l2)' },
+      weekBlock: { position: 'absolute', boxSizing: 'border-box', borderRadius: 4, padding: '2px 4px', fontSize: 10.5, lineHeight: '13px', overflow: 'hidden', cursor: 'pointer', color: 'var(--dsw-alias-label-primary)' },
+      weekNowLine: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, pointerEvents: 'none', background: 'var(--dsw-alias-state-error-primary)' },
     }
 
     const PLUGIN_CSS = `
@@ -440,8 +480,14 @@ window.__ModuleLoader__.load({
 .td-subtask-delete { transition: color .12s ease; }
 .td-subtask-delete:hover { color: var(--dsw-alias-state-error-primary); }
 
+/* 周视图的块/胶囊：键盘可达，但不能带 role=button（保持行内 checkbox 可读） */
+.td-week-item { transition: filter .12s ease; }
+.td-week-item:hover { filter: brightness(1.12); }
+.td-week-item:focus { outline: none; }
+.td-week-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
+
 @media (prefers-reduced-motion: reduce) {
-  .td-overlay, .td-dialog, .td-btn, .td-primary, .td-input, .td-row, .td-pop, .td-notify-pop, .td-rail-btn, .td-quadrant-card, .td-todo-row { animation: none; transition: none; }
+  .td-overlay, .td-dialog, .td-btn, .td-primary, .td-input, .td-row, .td-pop, .td-notify-pop, .td-rail-btn, .td-quadrant-card, .td-todo-row, .td-week-item { animation: none; transition: none; }
   .td-btn:active:not(:disabled), .td-primary:active:not(:disabled) { transform: none; }
 }
 `
@@ -498,6 +544,19 @@ window.__ModuleLoader__.load({
       return cells
     }
 
+    // 周视图沿用月历那套日期工具，不再自己推一遍周边界：先算 ISO 星期几，再回退到周一。
+    function mondayOfKey(key) {
+      const at = parseDateKey(key)
+      if (at === null) return dateKeyOf(new Date())
+      return shiftKeyLocal(key, -(isoWeekday(at) - 1))
+    }
+
+    function weekDayKeys(mondayKey) {
+      const keys = []
+      for (let index = 0; index < 7; index += 1) keys.push(shiftKeyLocal(mondayKey, index))
+      return keys
+    }
+
     function monthTitle(year, month) {
       return `${year} 年 ${month + 1} 月`
     }
@@ -508,6 +567,63 @@ window.__ModuleLoader__.load({
       if (match === null) return null
       if (Number(match[1]) > 23 || Number(match[2]) > 59) return null
       return { hour: match[1], minute: match[2] }
+    }
+
+    // 时间块用的纯函数：分钟数、日期格式化、以及同一列的重叠分道。
+    function minutesOfTime(value) {
+      const parts = splitTimeKey(value)
+      if (parts === null) return null
+      return Number(parts.hour) * 60 + Number(parts.minute)
+    }
+
+    function formatWeekDayKey(key, t, full) {
+      const at = parseDateKey(key)
+      if (at === null) return key
+      return String(t(full ? 'weekDayFull' : 'weekDayShort'))
+        .replace('{y}', String(at.getFullYear()))
+        .replace('{m}', String(at.getMonth() + 1))
+        .replace('{d}', String(at.getDate()))
+    }
+
+    function formatWeekDateKey(key, t) {
+      const at = parseDateKey(key)
+      if (at === null) return key
+      return String(t('weekDateShort'))
+        .replace('{m}', String(at.getMonth() + 1))
+        .replace('{d}', String(at.getDate()))
+    }
+
+    /**
+     * 同一列里的重叠块不能互相盖住：按开始时间排序，逐个塞进第一条空着的道。
+     * 返回 { blocks, lanes }，调用方按 lanes 均分列宽。
+     * 缺 endTime（或 end <= start）时按 60 分钟画，与产品口径一致。
+     */
+    function layoutDayBlocks(rows) {
+      const blocks = []
+      for (const item of rows) {
+        const start = minutesOfTime(item.startTime) ?? minutesOfTime(item.dueTime)
+        if (start === null) continue
+        let end = minutesOfTime(item.endTime)
+        if (end === null || end <= start) end = start + 60
+        if (end > 24 * 60) end = 24 * 60
+        blocks.push({ item, start, end, lane: 0 })
+      }
+      blocks.sort((a, b) => (a.start - b.start) || (a.end - b.end))
+      const laneEnds = []
+      for (const block of blocks) {
+        let lane = -1
+        for (let index = 0; index < laneEnds.length; index += 1) {
+          if (laneEnds[index] <= block.start) { lane = index; break }
+        }
+        if (lane === -1) {
+          lane = laneEnds.length
+          laneEnds.push(block.end)
+        } else {
+          laneEnds[lane] = block.end
+        }
+        block.lane = lane
+      }
+      return { blocks, lanes: Math.max(1, laneEnds.length) }
     }
 
     const WEEKDAY_LABELS = {
@@ -1294,11 +1410,193 @@ window.__ModuleLoader__.load({
               key: `${item.todoId}-${item.date}`,
               style: S.calendarViewItem,
             },
-            h('span', { style: { ...S.dot, background: priorityColor(item.priority) }, 'aria-hidden': 'true' }),
+            h('span', { style: { ...S.dot, background: QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority) }, 'aria-hidden': 'true' }),
             h('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, asText(item.title)))),
             items.length > 2 ? h('div', { style: S.calendarViewMore }, `+${items.length - 2}`) : null)
           })),
       )
+    }
+
+    /**
+     * 周视图：所选周的 7 天 × 0-24 时段。
+     * 这是「看排期」的展示视图，不是番茄钟 —— 只读、点击块打开右侧详情。
+     *
+     * 布局要点：星期表头 + 全天带 + 分时网格放在同一个滚动容器里，
+     * 表头两行用 position: sticky 吸顶。这样 7 列与左侧时间轴天然对齐，
+     * 不会因为滚动条宽度差出十几像素。
+     */
+    function WeekView({ t, onSelect, version }) {
+      const [mondayKey, setMondayKey] = useState(() => mondayOfKey(dateKeyOf(new Date())))
+      const [items, setItems] = useState([])
+      const scrollRef = useRef(null)
+
+      const weekDays = weekDayKeys(mondayKey)
+      const from = weekDays[0]
+      const to = weekDays[6]
+      const todayKey = dateKeyOf(new Date())
+      const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+      // 英文的 weekPrefix 是空串；字典查不到时会回落到 key 本身，这里兜一下。
+      const prefixRaw = t('weekPrefix')
+      const weekPrefix = prefixRaw === 'weekPrefix' ? '' : asText(prefixRaw)
+
+      // 独立于月历那份 fetch：切周、数据变更各自重取，互不干扰。
+      useEffect(() => {
+        let alive = true
+        fetchApi('occurrences', { from, to }, t)
+          .then((result) => {
+            if (!alive) return
+            setItems(Array.isArray(result?.items) ? result.items : [])
+          })
+          .catch((err) => {
+            if (!alive) return
+            console.error('[dsh-sidebar-todo] week occurrences failed', err)
+            setItems([])
+          })
+        return () => { alive = false }
+      }, [from, to, version])
+
+      // 首次渲染（以及切到另一周）把 07:00 滚到表头下方：sticky 表头正好盖住 0-6 点，
+      // 所以 scrollTop 就等于 7 小时的像素高度。
+      useEffect(() => {
+        const node = scrollRef.current
+        if (node === null) return
+        node.scrollTop = 7 * HOUR_PX
+      }, [mondayKey])
+
+      // 全天带 = 重复任务 ∪ 没有时间块的任务（否则它们会整周看不见）。
+      const allDayByDate = {}
+      const timedByDate = {}
+      for (const item of items) {
+        const key = asText(item.date)
+        if (key === '') continue
+        const repeating = item.repeat !== null && item.repeat !== undefined && item.repeat !== false
+        const start = minutesOfTime(item.startTime) ?? minutesOfTime(item.dueTime)
+        if (repeating || start === null) (allDayByDate[key] ??= []).push(item)
+        else (timedByDate[key] ??= []).push(item)
+      }
+
+      const rangeLabel = String(t('weekRange'))
+        .replace('{from}', formatWeekDayKey(from, t, true))
+        .replace('{to}', formatWeekDayKey(to, t, false))
+
+      const accentOf = (item) => QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority)
+
+      const openItem = (item) => {
+        if (typeof onSelect === 'function') onSelect(item.todoId)
+      }
+
+      const keyHandler = (item) => (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault?.()
+        openItem(item)
+      }
+
+      return h('div', { style: S.weekView },
+        h('div', { style: S.weekNav },
+          h('button', {
+            type: 'button', className: 'td-btn', style: S.calendarBtn,
+            'aria-label': t('prevWeek'),
+            onClick: () => setMondayKey(shiftKeyLocal(mondayKey, -7)),
+          }, '‹'),
+          h('div', { style: S.weekNavTitle }, rangeLabel),
+          h('button', {
+            type: 'button', className: 'td-btn', style: S.calendarBtn,
+            'aria-label': t('nextWeek'),
+            onClick: () => setMondayKey(shiftKeyLocal(mondayKey, 7)),
+          }, '›'),
+          h('button', {
+            type: 'button', className: 'td-btn',
+            style: { ...S.btnGhost, height: 28, padding: '0 10px' },
+            onClick: () => setMondayKey(mondayOfKey(dateKeyOf(new Date()))),
+          }, t('week'))),
+
+        h('div', { ref: scrollRef, style: S.weekScroll },
+          // 星期行
+          h('div', { style: S.weekHeadRow },
+            h('div', { style: S.weekGutter }),
+            weekDays.map((key, index) => {
+              const isToday = key === todayKey
+              return h('div', { key, style: S.weekDayCol },
+                h('span', { style: isToday ? { ...S.weekDayName, ...S.weekDayToday } : S.weekDayName },
+                  weekPrefix + t(WEEKDAY_OPTIONS[index][0])),
+                h('span', { style: isToday ? { ...S.weekDayDate, ...S.weekDayToday } : S.weekDayDate },
+                  formatWeekDateKey(key, t)))
+            })),
+
+          // 全天带（重复任务 + 无时间块的任务）
+          h('div', { style: S.weekAllDayRow },
+            h('div', { style: S.weekAllDayLabel }, t('allDay')),
+            weekDays.map((key) => h('div', { key, style: S.weekAllDayCol },
+              (allDayByDate[key] ?? []).map((item) => {
+                const accent = accentOf(item)
+                return h('div', {
+                  key: `${asText(item.todoId)}-${key}`,
+                  className: 'td-week-item',
+                  tabIndex: 0,
+                  'aria-label': asText(item.title),
+                  style: {
+                    ...S.weekChip,
+                    background: `color-mix(in srgb, ${accent} 26%, transparent)`,
+                    borderLeft: `3px solid ${accent}`,
+                    opacity: item.done ? 0.55 : 1,
+                    textDecoration: item.done ? 'line-through' : 'none',
+                  },
+                  onClick: () => openItem(item),
+                  onKeyDown: keyHandler(item),
+                }, asText(item.title))
+              })))),
+
+          // 分时网格
+          h('div', { style: S.weekGrid },
+            h('div', { style: S.weekHourCol },
+              HOUR_OPTIONS.map((hour) => h('div', { key: hour, style: S.weekHourLabel }, `${Number(hour)}:00`))),
+            weekDays.map((key) => {
+              const layout = layoutDayBlocks(timedByDate[key] ?? [])
+              const isToday = key === todayKey
+              return h('div', {
+                key,
+                style: {
+                  ...S.weekDayStrip,
+                  backgroundImage: `repeating-linear-gradient(to bottom, var(--dsw-alias-border-l2) 0, var(--dsw-alias-border-l2) 0.5px, transparent 0.5px, transparent ${HOUR_PX}px)`,
+                },
+              },
+              layout.blocks.map((block) => {
+                const item = block.item
+                const accent = accentOf(item)
+                const width = 100 / layout.lanes
+                return h('div', {
+                  key: `${asText(item.todoId)}-${key}-${block.start}`,
+                  className: 'td-week-item',
+                  tabIndex: 0,
+                  'aria-label': asText(item.title),
+                  style: {
+                    ...S.weekBlock,
+                    top: (block.start / 60) * HOUR_PX,
+                    height: Math.max(20, ((block.end - block.start) / 60) * HOUR_PX),
+                    left: `${block.lane * width}%`,
+                    width: `${width}%`,
+                    background: `color-mix(in srgb, ${accent} 30%, transparent)`,
+                    borderLeft: `3px solid ${accent}`,
+                    opacity: item.done ? 0.55 : 1,
+                  },
+                  onClick: () => openItem(item),
+                  onKeyDown: keyHandler(item),
+                },
+                h('span', {
+                  style: {
+                    display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap', textDecoration: item.done ? 'line-through' : 'none',
+                  },
+                }, asText(item.title)))
+              }),
+              isToday
+                ? h('div', {
+                    style: { ...S.weekNowLine, top: (nowMinutes / 60) * HOUR_PX },
+                    'aria-hidden': 'true',
+                    title: t('nowLine'),
+                  })
+                : null)
+            }))))
     }
 
     // --- New components ---
@@ -1652,6 +1950,53 @@ window.__ModuleLoader__.load({
         }, '+ ' + t('newCategory'))))
     }
 
+    /**
+     * 一行待办。完成态 = 实心勾 + 删除线，并且**留在原处不消失** ——
+     * 「完成即消失」让人无法确认自己到底做没做，也没法撤销误勾。
+     */
+    function TodoRow({ t, item, selectedId, onSelect, onToggle }) {
+      const done = Boolean(item.done)
+      const selected = item.id === selectedId
+      // 循环任务以本周期实例为准：dueDate 为空说明系列已结束，
+      // 复选框置灰且不响应（与 handleToggle 的提前 return 保持一致）。
+      const ended = Boolean(item.isRepeating) && asText(item.dueDate) === ''
+      return h('div', {
+        key: item.id,
+        className: 'td-todo-row',
+        style: selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow,
+        onClick: () => onSelect(item.id),
+      },
+      checkHit(
+        () => { if (!ended) onToggle(item) },
+        h('span', {
+          role: 'checkbox',
+          'aria-checked': done ? 'true' : 'false',
+          'aria-disabled': ended ? 'true' : undefined,
+          'aria-label': asText(item.title),
+          tabIndex: 0,
+          className: 'td-check',
+          style: ended
+            ? { ...(done ? S.todoCircleDone : S.todoCircle), opacity: 0.4 }
+            : (done ? S.todoCircleDone : S.todoCircle),
+          onKeyDown: (e) => {
+            if (e.nativeEvent?.isComposing === true) return
+            if (ended) return
+            if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggle(item) }
+          },
+        }, done
+          ? h('svg', { width: 9, height: 9, viewBox: '0 0 16 16', fill: 'none', stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 2.4 },
+              h('path', { d: 'M3.4 8.4 6.2 11l6.4-6.4', strokeLinecap: 'round', strokeLinejoin: 'round' }))
+          : null)),
+      h('button', {
+        type: 'button',
+        className: 'td-title',
+        'aria-current': selected ? 'true' : 'false',
+        style: done ? S.todoTitleDone : S.todoTitle,
+        onClick: (e) => { e.stopPropagation(); onSelect(item.id) },
+      }, asText(item.title)),
+      h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }, dueLabel(item)))
+    }
+
     function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd }) {
       const byQuadrant = useMemo(() => {
         const map = {}
@@ -1692,49 +2037,34 @@ window.__ModuleLoader__.load({
                       h('rect', { x: 8, y: 8, width: 32, height: 32, rx: 4 }),
                       h('path', { d: 'M16 20h16M16 28h10', strokeLinecap: 'round' })),
                     h('span', null, t(emptyCaptions[q.key])))
-                : qItems.map((item) => {
-                    const done = Boolean(item.done)
-                    const selected = item.id === selectedId
-                    // 循环任务以本周期实例为准：dueDate 为空说明系列已结束，
-                    // 复选框置灰且不响应（与 handleToggle 的提前 return 保持一致）。
-                    const ended = Boolean(item.isRepeating) && asText(item.dueDate) === ''
-                    return h('div', {
-                      key: item.id,
-                      className: 'td-todo-row',
-                      style: selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow,
-                      onClick: () => onSelect(item.id),
-                    },
-                    checkHit(
-                      () => { if (!ended) onToggle(item) },
-                      h('span', {
-                        role: 'checkbox',
-                        'aria-checked': done ? 'true' : 'false',
-                        'aria-disabled': ended ? 'true' : undefined,
-                        'aria-label': asText(item.title),
-                        tabIndex: 0,
-                        className: 'td-check',
-                        style: ended
-                          ? { ...(done ? S.todoCircleDone : S.todoCircle), opacity: 0.4 }
-                          : (done ? S.todoCircleDone : S.todoCircle),
-                        onKeyDown: (e) => {
-                          if (e.nativeEvent?.isComposing === true) return
-                          if (ended) return
-                          if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggle(item) }
-                        },
-                      }, done
-                        ? h('svg', { width: 9, height: 9, viewBox: '0 0 16 16', fill: 'none', stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 2.4 },
-                            h('path', { d: 'M3.4 8.4 6.2 11l6.4-6.4', strokeLinecap: 'round', strokeLinejoin: 'round' }))
-                        : null)),
-                    h('button', {
-                      type: 'button',
-                      className: 'td-title',
-                      'aria-current': selected ? 'true' : 'false',
-                      style: done ? S.todoTitleDone : S.todoTitle,
-                      onClick: (e) => { e.stopPropagation(); onSelect(item.id) },
-                    }, asText(item.title)),
-                    h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }, dueLabel(item)))
-                  })))
+                : qItems.map((item) => h(TodoRow, {
+                    key: item.id, t, item, selectedId, onSelect, onToggle,
+                  }))))
         }))
+    }
+
+    /**
+     * 收集箱：还没有象限的任务。矩阵按象限分组，这些任务在那里无处可去 ——
+     * 少了这块，快捷添加建出来的任务在界面上根本看不见。
+     */
+    function InboxArea({ t, items, onSelect, selectedId, onToggle, onAdd }) {
+      return h('div', { style: { ...S.matrixArea, gridTemplateColumns: '1fr', gridTemplateRows: '1fr' } },
+        h('div', { style: S.quadrantCard, className: 'td-quadrant-card' },
+          h('div', { style: S.quadrantHead },
+            h('span', { style: { width: 4, height: 20, borderRadius: 2, background: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }),
+            h('span', { style: S.quadrantTitle }, t('inbox')),
+            h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', marginRight: 8 } }, String(items.length)),
+            h('button', {
+              type: 'button',
+              className: 'td-btn',
+              style: S.quadrantAddBtn,
+              'aria-label': t('addTodo'),
+              onClick: () => onAdd(null),
+            }, '+')),
+          h('div', { style: S.quadrantBody },
+            items.length === 0
+              ? h('div', { style: S.emptyState }, h('span', null, t('empty')))
+              : items.map((item) => h(TodoRow, { key: item.id, t, item, selectedId, onSelect, onToggle })))))
     }
 
     function DetailPanel({ t, item, categories, onManageCategories, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove }) {
@@ -1744,18 +2074,22 @@ window.__ModuleLoader__.load({
       const [quadrant, setQuadrant] = useState(item.quadrant ?? null)
       const [dueDate, setDueDate] = useState(asText(item.dueDate))
       const [dueTime, setDueTime] = useState(asText(item.dueTime))
+      const [startTime, setStartTime] = useState(asText(item.startTime))
+      const [endTime, setEndTime] = useState(asText(item.endTime))
       const [repeat, setRepeat] = useState(item.repeat ?? null)
       const [subtaskInput, setSubtaskInput] = useState('')
       const [showCategoryPicker, setShowCategoryPicker] = useState(false)
       const [showQuadrantPicker, setShowQuadrantPicker] = useState(false)
       const [showDatePicker, setShowDatePicker] = useState(false)
       const [showRepeatPicker, setShowRepeatPicker] = useState(false)
-      // 同一时刻只开一个属性选择器，避免四个弹层互相叠着。
+      const [showTimePicker, setShowTimePicker] = useState(false)
+      // 同一时刻只开一个属性选择器，避免弹层互相叠着。
       const openPicker = (which) => {
         setShowCategoryPicker(which === 'category' ? !showCategoryPicker : false)
         setShowQuadrantPicker(which === 'quadrant' ? !showQuadrantPicker : false)
         setShowDatePicker(which === 'date' ? !showDatePicker : false)
         setShowRepeatPicker(which === 'repeat' ? !showRepeatPicker : false)
+        setShowTimePicker(which === 'time' ? !showTimePicker : false)
       }
       // 属性行：左标签 / 右值 + 箭头；点整行开合对应选择器。键盘可达。
       const propRow = (label, value, which) => h('div', {
@@ -1787,6 +2121,8 @@ window.__ModuleLoader__.load({
           setQuadrant(item.quadrant ?? null)
           setDueDate(asText(item.dueDate))
           setDueTime(asText(item.dueTime))
+          setStartTime(asText(item.startTime))
+          setEndTime(asText(item.endTime))
           setRepeat(item.repeat ?? null)
         }
       }, [item])
@@ -1818,6 +2154,13 @@ window.__ModuleLoader__.load({
         setSaving(true)
         setSavedMsg(null)
         try {
+          // 宿主会拒绝「结束不晚于开始」的时间段；先在这里拦一下，
+          // 否则用户只会看到笼统的「保存失败」，不知道错在哪。
+          if (startTime !== '' && endTime !== '' && endTime <= startTime) {
+            setSavedMsg({ ok: false, msg: t('timeRangeInvalid') })
+            setTimeout(() => setSavedMsg(null), 3000)
+            return
+          }
           const payload = {
             title: title.trim() || asText(item.title),
             note: note.trim(),
@@ -1825,6 +2168,8 @@ window.__ModuleLoader__.load({
             quadrant: quadrant || null,
             dueDate: dueDate === '' ? null : dueDate,
             dueTime: dueTime === '' ? null : dueTime,
+            startTime: startTime === '' ? null : startTime,
+            endTime: endTime === '' ? null : endTime,
             repeat: repeat || null,
           }
           const ok = await onSave(payload)
@@ -1867,6 +2212,12 @@ window.__ModuleLoader__.load({
         if (repeat.freq === 'weekly') return t('repeatWeekly')
         if (repeat.freq === 'monthly') return t('repeatMonthly')
         return t('repeatNoneShort')
+      }
+
+      // 时间段：开始/结束都空才算「未设置」，只填一边也照样显示出来。
+      const timeDisplay = () => {
+        const parts = [startTime, endTime].filter((value) => value !== '')
+        return parts.length === 0 ? t('dueNone') : parts.join(' – ')
       }
 
       return h('div', { style: S.detailPanel },
@@ -1986,6 +2337,30 @@ window.__ModuleLoader__.load({
                 }))
             : null,
 
+          propRow(t('timeRange'), timeDisplay(), 'time'),
+          showTimePicker
+            ? h('div', { style: S.pickerBody },
+                h('div', { style: S.fieldRow },
+                  h('div', { style: { ...S.field, flex: '1 1 0' } },
+                    h('span', { style: S.fieldLabel }, t('timeStart')),
+                    h(TimeField, {
+                      t,
+                      value: startTime,
+                      onChange: (next) => { setStartTime(next); markDirty() },
+                    })),
+                  h('div', { style: { ...S.field, flex: '1 1 0' } },
+                    h('span', { style: S.fieldLabel }, t('timeEnd')),
+                    h(TimeField, {
+                      t,
+                      value: endTime,
+                      onChange: (next) => { setEndTime(next); markDirty() },
+                    }))),
+                h('button', {
+                  type: 'button', className: 'td-btn', style: S.pickerClear,
+                  onClick: () => { setStartTime(''); setEndTime(''); markDirty() },
+                }, t('clearValue')))
+            : null,
+
           propRow(t('propertyRepeat'), repeatDisplay(), 'repeat'),
           showRepeatPicker
             ? h('div', { style: S.repeatPicker },
@@ -2093,7 +2468,6 @@ window.__ModuleLoader__.load({
       const [selected, setSelected] = useState(null)
       const [dialog, setDialog] = useState(null)
       const [categoryOpen, setCategoryOpen] = useState(false)
-      const [calendarActive, setCalendarActive] = useState(false)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
       const [calendarItems, setCalendarItems] = useState([])
       const [settings, setSettings] = useState({ notify: { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, quietHours: { enabled: false, start: '22:00', end: '08:00' } } })
@@ -2318,25 +2692,22 @@ window.__ModuleLoader__.load({
         setDialog({ initial: { quadrant } })
       }
 
-      // 矩阵只显示「未完成 + 已归入象限」的计划；再叠加可选的按天筛选。
+      /** 未完成在前、已完成后在后。完成的行**不再被剔除**。 */
+      const byDoneLast = (rows) => rows.slice().sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done)))
+
+      // 矩阵 = 已归入象限的计划（**含已完成**），再叠加可选的按天筛选。
       const quadrantItems = useMemo(() => {
-        let rows = items.filter((item) => !item.done && item.quadrant)
+        let rows = items.filter((item) => Boolean(item.quadrant))
         if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
-        return rows
+        return byDoneLast(rows)
       }, [items, dayFilter])
 
-      const renderCalendarView = () => {
-        if (!calendarActive) return null
-        return h(CalendarView, {
-          t,
-          selectedDay: null,
-          onPickDay: (key) => {
-            setCalendarActive(false)
-            handleSelectDay(key)
-          },
-          version: dataVersion,
-        })
-      }
+      // 收集箱 = 还没有象限的任务。矩阵按象限分组，它们在那里无处可去。
+      const inboxItems = useMemo(() => {
+        let rows = items.filter((item) => !item.quadrant)
+        if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
+        return byDoneLast(rows)
+      }, [items, dayFilter])
 
       const handleSelect = (id) => {
         setSelected(id)
@@ -2348,45 +2719,33 @@ window.__ModuleLoader__.load({
       }
 
       const activeRailContent = () => {
+        // 视图 = 月历（始终是月历，不再有「列表/日历」二选一的分支）
         if (activeRail === 'view') {
-          return calendarActive
-            ? renderCalendarView()
-            : h('div', { style: S.matrixArea },
-                items.filter((i) => !i.done).map((item) => h('div', {
-                  key: item.id,
-                  className: 'td-todo-row',
-                  style: { ...S.todoRow, background: 'var(--dsw-specific-input-major)', marginBottom: 4, padding: '0 12px' },
-                  onClick: () => handleSelect(item.id),
-                },
-                checkHit(
-                  () => handleToggle(item),
-                  h('span', {
-                    role: 'checkbox',
-                    'aria-checked': item.done ? 'true' : 'false',
-                    'aria-label': asText(item.title),
-                    tabIndex: 0,
-                    className: 'td-check',
-                    style: item.done ? { ...S.todoCheckbox, ...S.todoCheckboxDone } : S.todoCheckbox,
-                    onKeyDown: (e) => {
-                      if (e.nativeEvent?.isComposing === true) return
-                      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handleToggle(item) }
-                    },
-                  }, item.done
-                    ? h('svg', { width: 9, height: 9, viewBox: '0 0 16 16', fill: 'none', stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 2.4 },
-                        h('path', { d: 'M3.4 8.4 6.2 11l6.4-6.4', strokeLinecap: 'round', strokeLinejoin: 'round' }))
-                    : null)),
-                h('button', {
-                  type: 'button',
-                  className: 'td-title',
-                  style: S.todoTitle,
-                  onClick: (e) => { e.stopPropagation(); handleSelect(item.id) },
-                }, asText(item.title)),
-                h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }, dueLabel(item)))))
+          return h(CalendarView, {
+            t,
+            selectedDay: null,
+            onPickDay: handleSelectDay,
+            version: dataVersion,
+          })
         }
+        // 专注 = 周视图（7 天 × 0-24 时段）
         if (activeRail === 'focus') {
-          return h('div', { style: { ...S.matrixArea, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--dsw-alias-label-tertiary)', fontSize: 14 } },
-            h('div', { style: { fontSize: 48, marginBottom: 12 } }, '⌛'),
-            h('div', null, selectedItem ? asText(selectedItem.title) : t('pickOne')))
+          return h(WeekView, {
+            t,
+            onSelect: handleSelect,
+            version: dataVersion,
+          })
+        }
+        // 收集箱单独一屏：矩阵只吃有象限的任务，否则这些任务在界面上无处可见。
+        if (activeFilter === '__inbox__') {
+          return h(InboxArea, {
+            t,
+            items: inboxItems,
+            onSelect: handleSelect,
+            selectedId: selected,
+            onToggle: handleToggle,
+            onAdd: handleAddToQuadrant,
+          })
         }
         // Default: plan (matrix)
         return h(MatrixArea, {
@@ -2396,7 +2755,6 @@ window.__ModuleLoader__.load({
           selectedId: selected,
           onToggle: handleToggle,
           onAdd: handleAddToQuadrant,
-          quadrants: QUADRANTS,
         })
       }
 
@@ -2404,9 +2762,9 @@ window.__ModuleLoader__.load({
         h(TopBar, {
           t,
           onQuickAdd: handleQuickAdd,
-          onToggleCalendar: () => { setCalendarActive(!calendarActive); setActiveRail('view') },
+          onToggleCalendar: () => setActiveRail((prev) => (prev === 'view' ? 'plan' : 'view')),
           notificationOn,
-          calendarActive,
+          calendarActive: activeRail === 'view',
           settings,
           onSettingsChange: handleSaveSettings,
         }),
@@ -2507,6 +2865,8 @@ window.__ModuleLoader__.load({
         note: editing ? asText(initial.note) : '',
         dueDate: editing ? asText(initial.dueDate) : (asText(initial?.dueDate) || dateKeyOf(new Date())),
         dueTime: editing ? asText(initial.dueTime) : '',
+        startTime: editing ? asText(initial.startTime) : '',
+        endTime: editing ? asText(initial.endTime) : '',
         priority: editing && ['high', 'medium', 'low'].includes(initial.priority) ? initial.priority : null,
         category: editing ? asText(initial.category) : '',
         quadrant: editing && QUADRANT_MAP[initial.quadrant] ? initial.quadrant : (initial?.quadrant ?? null),
@@ -2565,6 +2925,8 @@ window.__ModuleLoader__.load({
                 title: parsed.title || prev.title,
                 dueDate: parsed.dueDate || prev.dueDate,
                 dueTime: parsed.dueTime || prev.dueTime,
+                startTime: parsed.startTime || prev.startTime,
+                endTime: parsed.endTime || prev.endTime,
                 priority: parsed.priority ?? prev.priority,
                 category: parsed.category || prev.category,
                 quadrant: parsed.quadrant ?? prev.quadrant,
@@ -2586,12 +2948,18 @@ window.__ModuleLoader__.load({
           setError(t('weekdaysRequired'))
           return
         }
+        if (form.startTime !== '' && form.endTime !== '' && form.endTime <= form.startTime) {
+          setError(t('timeRangeInvalid'))
+          return
+        }
         const category = form.category.trim()
         const payload = {
           title,
           note: form.note,
           dueDate: form.dueDate || null,
           dueTime: form.dueTime || null,
+          startTime: form.startTime || null,
+          endTime: form.endTime || null,
           priority: form.priority || null,
           category: category === '' ? null : category,
           quadrant: form.quadrant || null,
@@ -2675,6 +3043,24 @@ window.__ModuleLoader__.load({
               value: form.dueTime,
               onChange: (next) => setForm((prev) => ({ ...prev, dueTime: next })),
             }))),
+
+        h('div', { style: S.field },
+          h('span', { style: S.fieldLabel }, t('timeRange')),
+          h('div', { style: S.fieldRow },
+            h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
+              h('span', { style: S.fieldLabel }, t('timeStart')),
+              h(TimeField, {
+                t,
+                value: form.startTime,
+                onChange: (next) => setForm((prev) => ({ ...prev, startTime: next })),
+              })),
+            h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
+              h('span', { style: S.fieldLabel }, t('timeEnd')),
+              h(TimeField, {
+                t,
+                value: form.endTime,
+                onChange: (next) => setForm((prev) => ({ ...prev, endTime: next })),
+              })))),
 
         h('div', { style: S.field },
           h('span', { style: S.fieldLabel }, t('fieldPriority')),
