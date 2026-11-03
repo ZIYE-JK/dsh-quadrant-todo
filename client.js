@@ -218,6 +218,56 @@ window.__ModuleLoader__.load({
     const QUADRANT_MAP = QUADRANTS.reduce((acc, q) => { acc[q.key] = q; return acc }, {})
     const QUADRANT_COLORS = QUADRANTS.reduce((acc, q) => { acc[q.key] = q.color; return acc }, {})
 
+    // --- Icons ---
+    // 图标来自 Bootstrap Icons（MIT）。路径原样取自 https://github.com/twbs/icons
+    // 许可证见 THIRD-PARTY-NOTICES.md。16x16、fill=currentColor。
+    const ICONS = {
+      // grid-3x3-gap-fill — 2x2 象限矩阵入口
+      plan: ['M1 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1zM1 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1zM1 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm5 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z'],
+      // calendar3 — 月视图 / 日历
+      calendar: [
+        'M14 0H2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2M1 3.857C1 3.384 1.448 3 2 3h12c.552 0 1 .384 1 .857v10.286c0 .473-.448.857-1 .857H2c-.552 0-1-.384-1-.857z',
+        'M6.5 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m-9 3a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m-9 3a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2m3 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2',
+      ],
+      // calendar-week-fill — 周视图
+      week: ['M4 .5a.5.5 0 0 0-1 0V1H2a2 2 0 0 0-2 2v1h16V3a2 2 0 0 0-2-2h-1V.5a.5.5 0 0 0-1 0V1H4zM16 14V5H0v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2M9.5 7h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5m3 0h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5M2 10.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5'],
+      // bell-fill — 通知
+      bell: ['M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901'],
+      // inbox — 收集箱 / 空状态
+      inbox: ['M4.98 4a.5.5 0 0 0-.39.188L1.54 8H6a.5.5 0 0 1 .5.5 1.5 1.5 0 1 0 3 0A.5.5 0 0 1 10 8h4.46l-3.05-3.812A.5.5 0 0 0 11.02 4zm9.954 5H10.45a2.5 2.5 0 0 1-4.9 0H1.066l.32 2.562a.5.5 0 0 0 .497.438h12.234a.5.5 0 0 0 .496-.438zM3.809 3.563A1.5 1.5 0 0 1 4.981 3h6.038a1.5 1.5 0 0 1 1.172.563l3.7 4.625a.5.5 0 0 1 .105.374l-.39 3.124A1.5 1.5 0 0 1 14.117 13H1.883a1.5 1.5 0 0 1-1.489-1.314l-.39-3.124a.5.5 0 0 1 .106-.374z'],
+      // circle — 「全部」
+      circle: ['M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16'],
+      // slash-circle — 「无分类」
+      slashCircle: [
+        'M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16',
+        'M11.354 4.646a.5.5 0 0 0-.708 0l-6 6a.5.5 0 0 0 .708.708l6-6a.5.5 0 0 0 0-.708',
+      ],
+      // tag-fill — 分类
+      tag: ['M2 1a1 1 0 0 0-1 1v4.586a1 1 0 0 0 .293.707l7 7a1 1 0 0 0 1.414 0l4.586-4.586a1 1 0 0 0 0-1.414l-7-7A1 1 0 0 0 6.586 1zm4 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0'],
+      // chevron-down — 选择器展开指示
+      chevronDown: ['M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708'],
+      // chevron-left / chevron-right — 上/下个月、上/下一周
+      chevronLeft: ['M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0'],
+      chevronRight: ['M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708'],
+      // plus-lg — 新建
+      plus: ['M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2'],
+      // x-lg — 关闭 / 清除
+      x: ['M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z'],
+      // check2-square — 侧栏「待办」入口
+      todo: [
+        'M3 14.5A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5h8a.5.5 0 0 1 0 1H3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5V8a.5.5 0 0 1 1 0v5a1.5 1.5 0 0 1-1.5 1.5z',
+        'm8.354 10.354 7-7a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0',
+      ],
+      // check-lg — 复选框勾
+      check: ['M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425z'],
+      // clipboard-x — 空象限
+      clipboardX: [
+        'M6.146 7.146a.5.5 0 0 1 .708 0L8 8.293l1.146-1.147a.5.5 0 1 1 .708.708L8.707 9l1.147 1.146a.5.5 0 0 1-.708.708L8 9.707l-1.146 1.147a.5.5 0 0 1-.708-.708L7.293 9 6.146 7.854a.5.5 0 0 1 0-.708',
+        'M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1z',
+        'M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0z',
+      ],
+    }
+
     // --- API utilities ---
     function apiUrl(method) {
       return new URL(`todo/api/${method}`, document.baseURI).href
@@ -257,7 +307,7 @@ window.__ModuleLoader__.load({
       leftRail: { width: 120, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 4 },
       railItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 0', width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 8, transition: 'background 0.12s', fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
       railItemActive: { background: 'var(--dsw-specific-input-major)', color: 'var(--dsw-alias-label-primary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
-      railIcon: { fontSize: 20, lineHeight: 1 },
+      railIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
       railLabel: { fontSize: 11, lineHeight: 1 },
       railAvatar: { width: 32, height: 32, borderRadius: '50%', background: 'var(--dsw-alias-bg-module-platform)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginTop: 'auto', marginBottom: 12, color: 'var(--dsw-alias-label-tertiary)' },
       // Left panel
@@ -267,7 +317,7 @@ window.__ModuleLoader__.load({
       miniCalendar: { padding: '8px 12px 12px' },
       calendarHead: { display: 'flex', alignItems: 'center', gap: 4, height: 28, marginBottom: 4 },
       calendarTitle: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: 600 },
-      calendarBtn: { width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, color: 'var(--dsw-alias-label-secondary)', fontSize: 14, lineHeight: '24px', textAlign: 'center', cursor: 'pointer', background: 'transparent' },
+      calendarBtn: { width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, color: 'var(--dsw-alias-label-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent' },
       calendarGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 },
       calendarWeekday: { textAlign: 'center', fontSize: 10, lineHeight: '20px', color: 'var(--dsw-alias-label-tertiary)' },
       calendarCell: { height: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4, fontSize: 11, color: 'var(--dsw-alias-label-primary)', position: 'relative', padding: 0 },
@@ -278,7 +328,7 @@ window.__ModuleLoader__.load({
       categoryList: { padding: '4px 12px' },
       categoryRow: { display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13 },
       categoryRowSelected: { background: 'var(--dsw-alias-interactive-bg-hover)' },
-      categoryIcon: { fontSize: 16, flex: 'none', width: 20, textAlign: 'center' },
+      categoryIcon: { flex: 'none', width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' },
       categoryName: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       categoryCount: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
       newCategoryBtn: { display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', margin: '8px 12px', borderRadius: 6, border: '0.5px dashed var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', justifyContent: 'center' },
@@ -329,7 +379,7 @@ window.__ModuleLoader__.load({
       propertyRow: { display: 'flex', alignItems: 'center', height: 38, padding: '0 4px', cursor: 'pointer', borderRadius: 4, transition: 'background 0.12s' },
       propertyLabel: { width: 80, flex: 'none', fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' },
       propertyValue: { flex: 1, fontSize: 13, color: 'var(--dsw-alias-label-primary)', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-      propertyChevron: { flex: 'none', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', marginLeft: 4 },
+      propertyChevron: { flex: 'none', display: 'flex', alignItems: 'center', color: 'var(--dsw-alias-label-tertiary)', marginLeft: 4 },
       saveBtn: { height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 13, cursor: 'pointer', fontWeight: 500 },
       saveBtnContainer: { display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 20px', flex: 'none' },
       // Shared UI primitives
@@ -349,7 +399,7 @@ window.__ModuleLoader__.load({
       dialogFoot: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 },
       btnGhost: { height: 32, padding: '0 14px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-secondary)', fontSize: 12.5, cursor: 'pointer' },
       btnPrimary: { height: 32, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 12.5, cursor: 'pointer' },
-      noticeClose: { flex: 'none', width: 20, height: 20, padding: 0, lineHeight: '18px', textAlign: 'center', border: 'none', borderRadius: 4, color: 'inherit', fontSize: 14, cursor: 'pointer' },
+      noticeClose: { flex: 'none', width: 20, height: 20, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: 4, color: 'inherit', cursor: 'pointer' },
       // Category combo
       popEmpty: { padding: '8px', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' },
       popList: { maxHeight: 208, overflowY: 'auto' },
@@ -357,14 +407,14 @@ window.__ModuleLoader__.load({
       popCount: { marginLeft: 'auto', flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
       popSep: { height: '0.5px', margin: 4, background: 'var(--dsw-alias-border-l2)' },
       popManage: { display: 'flex', alignItems: 'center', width: '100%', height: 30, padding: '0 8px', border: 'none', borderRadius: 6, color: 'var(--dsw-alias-state-business-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', background: 'transparent' },
-      comboClear: { position: 'absolute', top: 0, right: 0, width: 30, height: 32, padding: 0, border: 'none', borderRadius: 8, color: 'var(--dsw-alias-label-tertiary)', fontSize: 14, lineHeight: '32px', textAlign: 'center', cursor: 'pointer', background: 'transparent' },
+      comboClear: { position: 'absolute', top: 0, right: 0, width: 30, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: 8, color: 'var(--dsw-alias-label-tertiary)', cursor: 'pointer', background: 'transparent' },
       // Picker
       pickerTrigger: { width: '100%', height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left', cursor: 'pointer' },
       pickerPlaceholder: { color: 'var(--dsw-alias-label-tertiary)' },
-      pickerIcon: { flex: 'none', fontSize: 10, lineHeight: 1, color: 'var(--dsw-alias-label-tertiary)' },
+      pickerIcon: { flex: 'none', display: 'flex', alignItems: 'center', color: 'var(--dsw-alias-label-tertiary)' },
       pickerHead: { display: 'flex', alignItems: 'center', gap: 2, height: 28 },
       pickerTitle: { flex: 1, minWidth: 0, textAlign: 'center', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', color: 'var(--dsw-alias-label-primary)' },
-      pickerIconBtn: { flex: 'none', width: 26, height: 26, padding: 0, border: 'none', borderRadius: 6, color: 'var(--dsw-alias-label-secondary)', fontSize: 15, lineHeight: '26px', textAlign: 'center', cursor: 'pointer', background: 'transparent' },
+      pickerIconBtn: { flex: 'none', width: 26, height: 26, padding: 0, border: 'none', borderRadius: 6, color: 'var(--dsw-alias-label-secondary)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'transparent' },
       pickerQuick: { display: 'flex', gap: 6 },
       pickerQuickBtn: { flex: 1, minWidth: 0, height: 26, padding: 0, border: '0.5px solid var(--dsw-alias-border-l2)', borderRadius: 6, color: 'var(--dsw-alias-label-secondary)', fontSize: 12, textAlign: 'center', cursor: 'pointer', background: 'transparent' },
       pickerWeekdays: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 },
@@ -1089,7 +1139,7 @@ window.__ModuleLoader__.load({
             'aria-label': t('noCategory'),
             title: t('noCategory'),
             onClick: () => { onChange(''); openAll() },
-          }, '×')
+          }, h(Icon, { name: 'x', size: 14 }))
         : null,
       open
         ? h('div', { className: popover.up ? 'td-pop td-pop-up' : 'td-pop', style: popover.popStyle },
@@ -1187,7 +1237,7 @@ window.__ModuleLoader__.load({
         onClick: open,
       },
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, text === '' ? t('pickDate') : text),
-      h('span', { style: S.pickerIcon, 'aria-hidden': 'true' }, '▾')),
+      h('span', { style: S.pickerIcon, 'aria-hidden': 'true' }, h(Icon, { name: 'chevronDown', size: 12 }))),
 
       picker.open
         ? h('div', {
@@ -1200,12 +1250,12 @@ window.__ModuleLoader__.load({
             h('button', {
               type: 'button', className: 'td-btn', style: S.pickerIconBtn,
               'aria-label': monthAt(-1), onClick: () => moveMonth(-1),
-            }, '‹'),
+            }, h(Icon, { name: 'chevronLeft', size: 14 })),
             h('span', { style: S.pickerTitle }, monthTitle(cursor.year, cursor.month)),
             h('button', {
               type: 'button', className: 'td-btn', style: S.pickerIconBtn,
               'aria-label': monthAt(1), onClick: () => moveMonth(1),
-            }, '›')),
+            }, h(Icon, { name: 'chevronRight', size: 14 }))),
           h('div', { style: S.pickerQuick },
             h('button', {
               type: 'button', className: 'td-btn', style: S.pickerQuickBtn,
@@ -1307,7 +1357,7 @@ window.__ModuleLoader__.load({
         onClick: open,
       },
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, text === '' ? t('pickTime') : text),
-      h('span', { style: S.pickerIcon, 'aria-hidden': 'true' }, '▾')),
+      h('span', { style: S.pickerIcon, 'aria-hidden': 'true' }, h(Icon, { name: 'chevronDown', size: 12 }))),
 
       picker.open
         ? h('div', {
@@ -1595,12 +1645,12 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button', className: 'td-btn', style: S.calendarBtn,
             'aria-label': t('prevMonth'), onClick: () => move(-1),
-          }, '‹'),
+          }, h(Icon, { name: 'chevronLeft', size: 14 })),
           h('div', { style: S.calendarViewTitle }, monthTitle(cursor.year, cursor.month)),
           h('button', {
             type: 'button', className: 'td-btn', style: S.calendarBtn,
             'aria-label': t('nextMonth'), onClick: () => move(1),
-          }, '›'),
+          }, h(Icon, { name: 'chevronRight', size: 14 })),
           h('button', {
             type: 'button', className: 'td-btn',
             style: { ...S.btnGhost, height: 28, padding: '0 10px' },
@@ -1857,13 +1907,13 @@ window.__ModuleLoader__.load({
             type: 'button', className: 'td-btn', style: S.calendarBtn,
             'aria-label': t('prevWeek'),
             onClick: () => setMondayKey(shiftKeyLocal(mondayKey, -7)),
-          }, '‹'),
+          }, h(Icon, { name: 'chevronLeft', size: 14 })),
           h('div', { style: S.weekNavTitle }, rangeLabel),
           h('button', {
             type: 'button', className: 'td-btn', style: S.calendarBtn,
             'aria-label': t('nextWeek'),
             onClick: () => setMondayKey(shiftKeyLocal(mondayKey, 7)),
-          }, '›'),
+          }, h(Icon, { name: 'chevronRight', size: 14 })),
           h('button', {
             type: 'button', className: 'td-btn',
             style: { ...S.btnGhost, height: 28, padding: '0 10px' },
@@ -1982,11 +2032,20 @@ window.__ModuleLoader__.load({
     }
 
     // --- New components ---
+    function Icon({ name, size = 16, style, className }) {
+      const paths = ICONS[name]
+      if (!paths) return null
+      return h('svg', {
+        width: size, height: size, viewBox: '0 0 16 16', fill: 'currentColor',
+        'aria-hidden': 'true', focusable: 'false', style, className,
+      }, paths.map((d, i) => h('path', { key: i, d })))
+    }
+
     function LeftRail({ t, active, onChange, onAvatarClick }) {
       const items = [
-        { key: 'plan', labelKey: 'plan', icon: '📅' },
-        { key: 'view', labelKey: 'view', icon: '▦' },
-        { key: 'focus', labelKey: 'focus', icon: '⌛' },
+        { key: 'plan', labelKey: 'plan', icon: 'plan' },
+        { key: 'view', labelKey: 'view', icon: 'calendar' },
+        { key: 'focus', labelKey: 'focus', icon: 'week' },
       ]
       return h('div', { style: S.leftRail },
         items.map((item) => h('button', {
@@ -1998,7 +2057,7 @@ window.__ModuleLoader__.load({
           style: active === item.key ? { ...S.railItem, ...S.railItemActive } : S.railItem,
           onClick: () => onChange(item.key),
         },
-        h('span', { style: S.railIcon }, item.icon),
+        h('span', { style: S.railIcon }, h(Icon, { name: item.icon, size: 18 })),
         h('span', { style: S.railLabel }, t(item.labelKey)))),
         h('div', { style: S.railAvatar, onClick: onAvatarClick }, '😼'))
     }
@@ -2104,7 +2163,7 @@ window.__ModuleLoader__.load({
               style: { ...S.iconBtn, ...(notificationOn ? S.iconBtnActive : null) },
               'aria-label': t('notificationToggle'),
               onClick: handleNotifyClick,
-            }, '🔔'),
+            }, h(Icon, { name: 'bell', size: 18 })),
             notifyOpen
               ? h('div', { className: 'td-notify-pop', style: S.notifyPopover },
                   h('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 4 } }, t('notifySettings')),
@@ -2191,7 +2250,7 @@ window.__ModuleLoader__.load({
             style: { ...S.iconBtn, ...(calendarActive ? S.iconBtnActive : null) },
             'aria-label': t('calendarIcon'),
             onClick: onToggleCalendar,
-          }, '📅')))
+          }, h(Icon, { name: 'calendar', size: 18 }))))
     }
 
     function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
@@ -2224,7 +2283,7 @@ window.__ModuleLoader__.load({
             'aria-label': t('inbox'),
             onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onInboxFilter() } },
           },
-          h('span', { style: S.categoryIcon }, '📥'),
+          h('span', { style: S.categoryIcon }, h(Icon, { name: 'inbox', size: 16 })),
           h('span', { style: S.categoryName }, t('inbox')),
           h('span', { style: S.categoryCount }, String(inboxCount)))),
 
@@ -2234,12 +2293,12 @@ window.__ModuleLoader__.load({
             h('button', {
               type: 'button', className: 'td-btn', style: S.calendarBtn,
               'aria-label': t('prevMonth'), onClick: () => onMonthChange(-1),
-            }, '‹'),
+            }, h(Icon, { name: 'chevronLeft', size: 14 })),
             h('div', { style: S.calendarTitle }, monthTitle(monthCursor.year, monthCursor.month)),
             h('button', {
               type: 'button', className: 'td-btn', style: S.calendarBtn,
               'aria-label': t('nextMonth'), onClick: () => onMonthChange(1),
-            }, '›')),
+            }, h(Icon, { name: 'chevronRight', size: 14 }))),
           h('div', { style: { display: 'flex', justifyContent: 'flex-end', marginBottom: 4 } },
             h('button', {
               type: 'button', className: 'td-btn',
@@ -2278,20 +2337,20 @@ window.__ModuleLoader__.load({
             style: { ...S.categoryRow, ...(activeFilter === 'all' ? S.categoryRowSelected : null) },
             onClick: () => onFilterChange('all'),
           },
-          h('span', { style: S.categoryIcon }, '◎'),
+          h('span', { style: S.categoryIcon }, h(Icon, { name: 'circle', size: 16 })),
           h('span', { style: S.categoryName }, t('all'))),
           h('div', {
             style: { ...S.categoryRow, ...(activeFilter === '__none__' ? S.categoryRowSelected : null) },
             onClick: () => onFilterChange('__none__'),
           },
-          h('span', { style: S.categoryIcon }, '⊘'),
+          h('span', { style: S.categoryIcon }, h(Icon, { name: 'slashCircle', size: 16 })),
           h('span', { style: S.categoryName }, t('uncategorized'))),
           categories.map((cat) => h('div', {
             key: cat.name,
             style: { ...S.categoryRow, ...(activeFilter === cat.name ? S.categoryRowSelected : null) },
             onClick: () => onFilterChange(cat.name),
           },
-          h('span', { style: S.categoryIcon }, cat.icon || '🏷️'),
+          h('span', { style: S.categoryIcon }, cat.icon ? cat.icon : h(Icon, { name: 'tag', size: 16 })),
           h('span', { style: S.categoryName }, cat.name),
           h('span', { style: S.categoryCount }, String(cat.count)))),
 
@@ -2340,8 +2399,7 @@ window.__ModuleLoader__.load({
             if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggle(item) }
           },
         }, done
-          ? h('svg', { width: 9, height: 9, viewBox: '0 0 16 16', fill: 'none', stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 2.4 },
-              h('path', { d: 'M3.4 8.4 6.2 11l6.4-6.4', strokeLinecap: 'round', strokeLinejoin: 'round' }))
+          ? h(Icon, { name: 'check', size: 9, style: { color: 'var(--dsw-alias-label-primary-inverted)' } })
           : null)),
       h('button', {
         type: 'button',
@@ -2397,13 +2455,11 @@ window.__ModuleLoader__.load({
                 style: S.quadrantAddBtn,
                 'aria-label': t('addTodo'),
                 onClick: () => onAdd(q.key),
-              }, '+')),
+              }, h(Icon, { name: 'plus', size: 16 }))),
             h('div', { style: S.quadrantBody },
               qItems.length === 0
                 ? h('div', { style: S.emptyState },
-                    h('svg', { width: 48, height: 48, viewBox: '0 0 48 48', fill: 'none', stroke: 'var(--dsw-alias-label-tertiary)', strokeWidth: 1.2, opacity: 0.4 },
-                      h('rect', { x: 8, y: 8, width: 32, height: 32, rx: 4 }),
-                      h('path', { d: 'M16 20h16M16 28h10', strokeLinecap: 'round' })),
+                    h(Icon, { name: 'clipboardX', size: 48, style: { color: 'var(--dsw-alias-label-tertiary)', opacity: 0.4 } }),
                     h('span', null, t(emptyCaptions[q.key])))
                 : qItems.map((item) => h(TodoRow, {
                     key: item.id, t, item, selectedId, onSelect, onToggle,
@@ -2428,7 +2484,7 @@ window.__ModuleLoader__.load({
               style: S.quadrantAddBtn,
               'aria-label': t('addTodo'),
               onClick: () => onAdd(null),
-            }, '+')),
+            }, h(Icon, { name: 'plus', size: 16 }))),
           h('div', { style: S.quadrantBody },
             items.length === 0
               ? h('div', { style: S.emptyState }, h('span', null, t('empty')))
@@ -2705,7 +2761,7 @@ window.__ModuleLoader__.load({
       },
       h('span', { style: S.propertyLabel }, label),
       h('span', { style: S.propertyValue }, value),
-      h('span', { style: S.propertyChevron }, '›'))
+      h('span', { style: S.propertyChevron }, h(Icon, { name: 'chevronRight', size: 12 })))
       const [dirty, setDirty] = useState(false)
       const [saving, setSaving] = useState(false)
       const [savedMsg, setSavedMsg] = useState(null)
@@ -2873,8 +2929,7 @@ window.__ModuleLoader__.load({
                         if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onToggleSubtask(sub) }
                       },
                     }, sub.done
-                      ? h('svg', { width: 9, height: 9, viewBox: '0 0 16 16', fill: 'none', stroke: 'var(--dsw-alias-label-primary-inverted)', strokeWidth: 2.4 },
-                          h('path', { d: 'M3.4 8.4 6.2 11l6.4-6.4', strokeLinecap: 'round', strokeLinejoin: 'round' }))
+                      ? h(Icon, { name: 'check', size: 9, style: { color: 'var(--dsw-alias-label-primary-inverted)' } })
                       : null)),
                   h('span', { style: { flex: 1, fontSize: 13, color: sub.done ? 'var(--dsw-alias-label-tertiary)' : 'var(--dsw-alias-label-primary)', textDecoration: sub.done ? 'line-through' : 'none' } }, asText(sub.title)),
                   h('button', {
@@ -2883,7 +2938,7 @@ window.__ModuleLoader__.load({
                     style: S.subtaskDeleteBtn,
                     'aria-label': t('subtaskDelete'),
                     onClick: () => onRemoveSubtask(sub),
-                  }, '×'))))),
+                  }, h(Icon, { name: 'x', size: 14 })))))),
 
         // Note
         h('div', { style: S.detailSection },
@@ -3452,7 +3507,7 @@ window.__ModuleLoader__.load({
                 type: 'button', className: 'td-btn', style: S.noticeClose,
                 'aria-label': t('dismiss'),
                 onClick: () => { corruptDismissed = true; setNoticeHidden(true) },
-              }, '×'))
+              }, h(Icon, { name: 'x', size: 14 })))
           : null,
         state.notices.includes('write-error')
           ? h('div', { style: S.warn },
@@ -3801,12 +3856,7 @@ window.__ModuleLoader__.load({
     }
 
     function TodoIcon({ size = 16 }) {
-      return h('svg', {
-        width: size, height: size, viewBox: '0 0 16 16', fill: 'none',
-        stroke: 'currentColor', strokeWidth: 1.4, 'aria-hidden': true,
-      },
-      h('rect', { x: 2.4, y: 2.4, width: 11.2, height: 11.2, rx: 2.4 }),
-      h('path', { d: 'M5.4 8.2l1.9 1.9 3.4-3.6', strokeLinecap: 'round', strokeLinejoin: 'round' }))
+      return h(Icon, { name: 'todo', size })
     }
 
     return {
