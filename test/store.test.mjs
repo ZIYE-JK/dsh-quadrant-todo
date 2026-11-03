@@ -38,12 +38,12 @@ async function freshStore(doc) {
   return { store: createStore({ file }), file, dir }
 }
 
-test('v1 -> v2: legacy quadrant name in category moves to quadrant', async () => {
+test('v1 -> v3: legacy quadrant name in category moves to quadrant', async () => {
   const { store } = await freshStore(V1)
   const res = await store.load()
   assert.equal(res.corrupt, false)
   assert.equal(res.migrated.from, 1)
-  assert.equal(res.migrated.to, 2)
+  assert.equal(res.migrated.to, 3)
   assert.equal(res.migrated.movedQuadrants, 1)
 
   const { items } = await store.list({ view: 'open' })
@@ -55,11 +55,11 @@ test('v1 -> v2: legacy quadrant name in category moves to quadrant', async () =>
   assert.equal(items[0].dueTime, '11:00')
 })
 
-test('v1 -> v2: writes back version 2 and keeps a v1 backup', async () => {
+test('v1 -> v3: writes back the current version and keeps a v1 backup', async () => {
   const { store, file } = await freshStore(V1)
   await store.load()
   const written = JSON.parse(await readFile(file, 'utf8'))
-  assert.equal(written.version, 2)
+  assert.equal(written.version, 3)
   assert.deepEqual(written.settings.notify.quietHours, { enabled: false, start: '22:00', end: '08:00' })
   assert.deepEqual(written.categories, {})
   const dir = file.replace(/[\\/]todos\.json$/, '')
@@ -69,8 +69,8 @@ test('v1 -> v2: writes back version 2 and keeps a v1 backup', async () => {
   assert.equal(backup.version, 1, 'backup is the untouched original')
 })
 
-test('v2 document loads without a migration record', async () => {
-  const { store } = await freshStore({ version: 2, todos: [], categories: {}, settings: {} })
+test('a current-version document loads without a migration record', async () => {
+  const { store } = await freshStore({ version: 3, todos: [], categories: {}, settings: {} })
   const res = await store.load()
   assert.equal(res.migrated, null)
 })

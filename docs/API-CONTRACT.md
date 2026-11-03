@@ -1,17 +1,29 @@
-# v2 数据模型与 API 契约
+# v3 数据模型与 API 契约
 
 > 分支 `feat/matrix-ui-notify`。宿主端与客户端共同遵守本文件。
 > 传输不变：`POST /todo/api/<method>`，请求体 JSON，响应 `{ok:true,result}` / `{ok:false,error:{code,message}}`。
 
 ---
 
-## 1. 数据文件 v2
+## 0. v3 相对 v2 的增量（周视图 + 可改时间）
+
+| 字段 | 说明 |
+|---|---|
+| `startTime` | `"HH:mm"` \| null — 排期时间段起点，周视图的时间块靠它定位 |
+| `endTime` | `"HH:mm"` \| null — 排期时间段终点，必须 **严格晚于** `startTime` |
+
+- `dueTime` **保留**（兼容 + 通知兜底）。语义分工：`startTime/endTime` 是**排期**，`dueTime` 是**截止**。
+- 通知触发点：`startTime ?? dueTime ?? 当天 09:00`。
+- `occurrences` 的每一项新增 `startTime` / `endTime` / `dueTime`，周视图直接消费。
+- 只给 `startTime` 不给 `endTime` 是合法的（未定时长的点状排期），周视图按 60 分钟画。
+
+## 1. 数据文件 v3
 
 路径不变：`%DSH_PROFILE_DIR%/data/dsh-todolist/todos.json`
 
 ```jsonc
 {
-  "version": 2,
+  "version": 3,
   "todos": [ /* 见 §2 */ ],
   "categories": { "工作": { "icon": "💻" }, "汽车": { "icon": "🚗" } },
   "settings": {
@@ -27,7 +39,9 @@
 }
 ```
 
-### v1 → v2 迁移（自动，一次性）
+### 迁移（自动，一次性）
+
+**v1 → v2**
 
 - 每条 todo 补 `quadrant: null`、`subtasks: []`
 - 补 `categories: {}`、`settings`（默认值）、`notified: {}`
@@ -36,7 +50,13 @@
   - `紧急不重要` → `urgent_not_important`
   - `重要不紧急` → `important_not_urgent`
   - `不重要不紧急` → `neither`
-- 迁移后写回 `version: 2`；迁移前把原文件备份为 `todos.v1-backup-<ts>.json`
+- 迁移后写回 `version`；迁移前把原文件备份为 `todos.v1-backup-<ts>.json`
+
+**v2 → v3**
+
+- 每条 todo 补 `startTime: null`、`endTime: null`
+- 坏值一律清成 `null`（含 `25:99` 这类格式对但不存在的时刻，以及 `endTime <= startTime` 的倒序区间——只丢 `endTime`，保留 `startTime`）
+- **不从 `dueTime` 反推 `startTime`**：不凭空造排期数据。周视图对没有 `startTime` 的任务按 `dueTime` 兜底定位
 
 ## 2. Todo 记录
 
@@ -49,7 +69,9 @@
   "priority": "high" | "medium" | "low" | null,     // 保留兼容，UI 不再主用
   "category": "string ≤24" | null,
   "dueDate": "YYYY-MM-DD" | null,
-  "dueTime": "HH:mm" | null,
+  "dueTime": "HH:mm" | null,                        // 截止
+  "startTime": "HH:mm" | null,                      // 排期起点（v3）
+  "endTime": "HH:mm" | null,                        // 排期终点（v3，必须晚于 startTime）
   "done": false,
   "repeat": { "freq": "daily|weekly|monthly", "interval": 1, "until": null, "weekdays": [1..7], "monthDay": 1..31 } | null,
   "completions": { "YYYY-MM-DD": "iso" },
@@ -74,7 +96,7 @@
 - `quadrant`：按象限过滤；传 `"__inbox__"` 表示收集箱（`quadrant === null`）
 - 返回增加 `inboxCount`（收集箱未完成条数）
 
-`create` / `update` 新增可写字段：`quadrant`、`subtasks`（整体替换）
+`create` / `update` 新增可写字段：`quadrant`、`subtasks`（整体替换）、`startTime`、`endTime`
 
 ### 新增
 
