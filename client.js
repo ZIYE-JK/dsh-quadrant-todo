@@ -200,18 +200,18 @@ window.__ModuleLoader__.load({
     // --- Styling ---
     const S = {
       // Main layout
-      page: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, color: 'var(--dsw-alias-label-primary)', fontFamily: 'var(--dsw-font-family, sans-serif)' },
+      page: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'var(--dsw-font-family, sans-serif)' },
       topBar: { display: 'flex', alignItems: 'center', height: 72, padding: '0 20px', flex: 'none', borderBottom: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-specific-input-major)' },
       mainBody: { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' },
       // Left rail
-      leftRail: { width: 120, flex: 'none', background: 'var(--dsw-alias-bg-base)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 4 },
+      leftRail: { width: 120, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 4 },
       railItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 0', width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 8, transition: 'background 0.12s', fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
       railItemActive: { background: 'var(--dsw-specific-input-major)', color: 'var(--dsw-alias-label-primary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
       railIcon: { fontSize: 20, lineHeight: 1 },
       railLabel: { fontSize: 11, lineHeight: 1 },
       railAvatar: { width: 32, height: 32, borderRadius: '50%', background: 'var(--dsw-alias-bg-module-platform)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginTop: 'auto', marginBottom: 12, color: 'var(--dsw-alias-label-tertiary)' },
       // Left panel
-      leftPanel: { width: 369, flex: 'none', background: 'var(--dsw-alias-bg-base)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
+      leftPanel: { width: 369, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
       panelSection: { padding: '12px 16px', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
       panelHeader: { display: 'flex', alignItems: 'center', gap: 8, height: 36, padding: '0 8px', borderRadius: 6, cursor: 'pointer' },
       panelHeaderIcon: { fontSize: 16, flex: 'none' },
@@ -283,7 +283,7 @@ window.__ModuleLoader__.load({
       subtaskRow: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 30, padding: '0 4px', borderRadius: 4 },
       subtaskInput: { flex: 1, height: 28, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '0 8px', borderRadius: 4 },
       subtaskDeleteBtn: { width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-      noteTextarea: { width: '100%', minHeight: 100, borderRadius: 6, background: 'var(--dsw-alias-bg-base)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', padding: 10, resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: '20px' },
+      noteTextarea: { width: '100%', minHeight: 100, borderRadius: 6, background: 'var(--dsw-specific-input-major)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', padding: 10, resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: '20px' },
       divider: { height: '0.5px', background: 'var(--dsw-alias-border-l2)', margin: '12px 20px' },
       propertyRow: { display: 'flex', alignItems: 'center', height: 38, padding: '0 4px', cursor: 'pointer', borderRadius: 4, transition: 'background 0.12s' },
       propertyLabel: { width: 80, flex: 'none', fontSize: 13, color: 'var(--dsw-alias-label-tertiary)' },
@@ -387,7 +387,7 @@ window.__ModuleLoader__.load({
 .td-primary:hover:not(:disabled) { filter: brightness(1.06); }
 .td-primary:active:not(:disabled) { transform: scale(.985); filter: brightness(.96); }
 .td-primary:focus { outline: none; }
-.td-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-bg-base), 0 0 0 3.5px var(--dsw-alias-state-business-primary); }
+.td-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-1), 0 0 0 3.5px var(--dsw-alias-state-business-primary); }
 
 .td-input { border: 0.5px solid var(--dsw-alias-border-l3); transition: border-color .12s ease, background-color .12s ease; }
 .td-input:hover { border-color: var(--dsw-alias-border-l4); }
@@ -2032,6 +2032,59 @@ window.__ModuleLoader__.load({
     // onclose 时再删除，既不会被回收，也不会无限增长。
     const LIVE_NOTIFICATIONS = new Set()
 
+    // 面板挂载时注册的「选中某条待办」回调；面板没开时为 null，点通知只把窗口拉到前台。
+    let SELECT_TODO = null
+
+    /**
+     * 通知轮询必须活在插件层，不能放在 TodoPage 里：
+     * 面板没打开时组件不挂载、轮询就不会跑 —— 而「没盯着待办面板」恰恰是最需要弹通知的时候。
+     */
+    function startNotificationWatch(getT) {
+      if (typeof Notification === 'undefined') return () => {}
+
+      // 浏览器只在用户手势里允许 requestPermission()。桌面壳的权限处理器本来就会放行，
+      // 所以先无手势试一次；被拒（仍是 default）就挂一次性监听，用户第一次点面板时再要。
+      try { void Notification.requestPermission?.() } catch (e) { /* 旧实现可能同步抛 */ }
+      if (Notification.permission === 'default') {
+        const ask = () => {
+          document.removeEventListener('pointerdown', ask, true)
+          try { void Notification.requestPermission?.() } catch (e) { /* 同上 */ }
+        }
+        document.addEventListener('pointerdown', ask, true)
+      }
+
+      const timer = window.setInterval(async () => {
+        if (Notification.permission !== 'granted') return
+        try {
+          const result = await fetchApi('notifyPoll', {}, getT())
+          const toasts = Array.isArray(result?.toasts) ? result.toasts : []
+          for (const toast of toasts) {
+            try {
+              const n = new Notification(toast.title || getT()('nav'), {
+                body: toast.body || '',
+                tag: 'dsh-sidebar-todo:' + (toast.kind || 'due'),
+                renotify: true,
+                silent: ('dshDesktop' in globalThis),
+              })
+              LIVE_NOTIFICATIONS.add(n)
+              n.onclick = () => {
+                LIVE_NOTIFICATIONS.delete(n)
+                try { window.focus() } catch (e) { /* focus 可能被浏览器策略拒绝 */ }
+                if (toast.id && typeof SELECT_TODO === 'function') SELECT_TODO(toast.id)
+              }
+              n.onclose = () => { LIVE_NOTIFICATIONS.delete(n) }
+              n.onerror = () => { LIVE_NOTIFICATIONS.delete(n) }
+            } catch (e) {
+              console.error('[dsh-sidebar-todo] notification failed', e)
+            }
+          }
+        } catch (err) {
+          console.error('[dsh-sidebar-todo] notifyPoll failed', err)
+        }
+      }, 3000)
+      return () => window.clearInterval(timer)
+    }
+
     function TodoPage(props) {
       const t = props.t ?? ((key) => dict.zh[key] ?? key)
       const [state, setState] = useState({ loading: true, error: null, items: [], summary: {}, notices: [], staleDays: 7, inboxCount: 0, categories: [] })
@@ -2136,38 +2189,10 @@ window.__ModuleLoader__.load({
         return () => window.clearInterval(timer)
       }, [reload])
 
-      // Notification poll interval
+      // 点系统通知时选中对应待办；面板卸载就摘掉回调，避免对已卸载组件 setState。
       useEffect(() => {
-        const timer = window.setInterval(async () => {
-          if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-          try {
-            const result = await fetchApi('notifyPoll', {}, tRef.current)
-            const toasts = Array.isArray(result?.toasts) ? result.toasts : []
-            for (const toast of toasts) {
-              try {
-                const n = new Notification(toast.title || tRef.current('nav'), {
-                  body: toast.body || '',
-                  tag: 'dsh-sidebar-todo:' + (toast.kind || 'due'),
-                  renotify: true,
-                  silent: ('dshDesktop' in globalThis),
-                })
-                LIVE_NOTIFICATIONS.add(n)
-                n.onclick = () => {
-                  LIVE_NOTIFICATIONS.delete(n)
-                  try { window.focus() } catch (e) { /* focus 可能被浏览器策略拒绝 */ }
-                  if (toast.id) setSelected(toast.id)
-                }
-                n.onclose = () => { LIVE_NOTIFICATIONS.delete(n) }
-                n.onerror = () => { LIVE_NOTIFICATIONS.delete(n) }
-              } catch (e) {
-                console.error('[dsh-sidebar-todo] notification failed', e)
-              }
-            }
-          } catch (err) {
-            console.error('[dsh-sidebar-todo] notifyPoll failed', err)
-          }
-        }, 3000)
-        return () => window.clearInterval(timer)
+        SELECT_TODO = (id) => setSelected(id)
+        return () => { SELECT_TODO = null }
       }, [])
 
       // Fetch calendar items when month changes or data changes
@@ -2761,6 +2786,9 @@ window.__ModuleLoader__.load({
         ctx.slots.inject('main', () => ctx.slots.register({
           name: 'main', key: 'todo', locale: NS, inject: () => ({ t }),
         }, TodoPage))
+
+        // 通知轮询挂在插件层：面板开着才轮询，等于「盯着看的时候才有提醒」。
+        ctx.effect(() => startNotificationWatch(() => t), 'dsh-sidebar-todo: notify-watch')
       },
     }
   },
