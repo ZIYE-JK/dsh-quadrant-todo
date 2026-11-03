@@ -92,6 +92,9 @@ window.__ModuleLoader__.load({
         allDay: '全天', nowLine: '现在',
         timeRange: '时间段', timeStart: '开始', timeEnd: '结束',
         timeRangeInvalid: '结束时间必须晚于开始时间',
+        // 周视图拖拽：块整体拖动 / 拖底边改时长 / 方向键等价操作
+        rescheduleHint: '拖动可调整时间，拖底部边缘可改时长（每次 30 分钟）',
+        resizeHint: '拖动调整时长',
         // --- v4: 时间单一化 / 完成期限 / 超期处理 / 重复 ---
         timePoint: '时间点', propertyTime: '时间',
         deadlineAt: '时限 {time}',
@@ -189,6 +192,9 @@ window.__ModuleLoader__.load({
         allDay: 'All day', nowLine: 'Now',
         timeRange: 'Time range', timeStart: 'Start', timeEnd: 'End',
         timeRangeInvalid: 'End time must be after start time',
+        // Week view drag: move the block / drag the bottom edge to resize / arrow keys
+        rescheduleHint: 'Drag to move, drag the bottom edge to resize (30-minute steps)',
+        resizeHint: 'Drag to resize',
         // --- v4: single time source / due presets / overdue handling / repeat ---
         timePoint: 'Time point', propertyTime: 'Time',
         deadlineAt: 'Due at {time}',
@@ -239,6 +245,11 @@ window.__ModuleLoader__.load({
     const HOUR_PX = 48
     const WEEK_GUTTER = 56
     const WEEK_HEAD_H = 44
+    // 周视图时间块的拖拽：每 30 分钟为一档（24px），移动超过这个像素数才算拖拽，否则算点击。
+    const SNAP_MIN = 30
+    const DRAG_SLOP_PX = 3
+    // 只给了 startTime 的「时间点」排期没有真实时长，按 60 分钟参与拖拽计算（与画块口径一致）。
+    const POINT_BLOCK_MIN = 60
     const S = {
       // Main layout
       page: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'var(--dsw-font-family, sans-serif)' },
@@ -447,6 +458,9 @@ window.__ModuleLoader__.load({
       weekHourLabel: { height: HOUR_PX, boxSizing: 'border-box', paddingRight: 6, textAlign: 'right', fontSize: 10, lineHeight: '11px', color: 'var(--dsw-alias-label-tertiary)' },
       weekDayStrip: { flex: '1 1 0', minWidth: 0, position: 'relative', borderLeft: '0.5px solid var(--dsw-alias-border-l2)' },
       weekBlock: { position: 'absolute', boxSizing: 'border-box', borderRadius: 4, padding: '2px 4px', fontSize: 10.5, lineHeight: '13px', overflow: 'hidden', cursor: 'pointer', color: 'var(--dsw-alias-label-primary)' },
+      // 时间块底部 ~6px 的缩放热区：默认几乎透明，悬停/拖动时才显出一条 grip。
+      weekResize: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 6, cursor: 'ns-resize', touchAction: 'none' },
+      weekBlockDragging: { zIndex: 5, boxShadow: 'var(--dsw-elevation-panel)' },
       weekNowLine: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, pointerEvents: 'none', background: 'var(--dsw-alias-state-error-primary)' },
     }
 
@@ -525,6 +539,23 @@ window.__ModuleLoader__.load({
 .td-week-item:hover { filter: brightness(1.12); }
 .td-week-item:focus { outline: none; }
 .td-week-item:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
+
+/* 时间块底部的缩放 grip：平时只有一条极淡的线，悬停/键盘聚焦时才明显 */
+.td-week-resize::after {
+  content: '';
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: .22;
+  transition: opacity .12s ease;
+}
+.td-week-item:hover .td-week-resize::after,
+.td-week-item:focus-visible .td-week-resize::after { opacity: .6; }
+.td-week-resize:hover::after { opacity: .85; }
 
 @media (prefers-reduced-motion: reduce) {
   .td-overlay, .td-dialog, .td-btn, .td-primary, .td-input, .td-row, .td-pop, .td-notify-pop, .td-rail-btn, .td-quadrant-card, .td-todo-row, .td-week-item { animation: none; transition: none; }
@@ -641,7 +672,8 @@ window.__ModuleLoader__.load({
     function layoutDayBlocks(rows) {
       const blocks = []
       for (const item of rows) {
-        const start = minutesOfTime(item.startTime) ?? minutesOfTime(item.dueTime)
+        // dueTime 在 v4 已废弃且恒为 null，这里只认 startTime。
+        const start = minutesOfTime(item.startTime)
         if (start === null) continue
         let end = minutesOfTime(item.endTime)
         if (end === null || end <= start) end = start + 60
@@ -664,6 +696,75 @@ window.__ModuleLoader__.load({
         block.lane = lane
       }
       return { blocks, lanes: Math.max(1, laneEnds.length) }
+    }
+
+    // --- 周视图拖拽/缩放：时间算术（纯函数，无 DOM） ---
+    // 一整天 = 1440 分钟；1440 只在写回时出现（"24:00"），read 端 splitTimeKey 仍然只认 00:00–23:59。
+    const DAY_MIN = 24 * 60
+
+    function timeOfMinutes(total) {
+      const value = Math.round(total)
+      if (!Number.isFinite(value) || value < 0 || value > DAY_MIN) return null
+      return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`
+    }
+
+    /** 像素位移 → 30 分钟整数档。 */
+    function snapMinutes(deltaPx) {
+      return Math.round(Number(deltaPx) / (HOUR_PX / 2)) * SNAP_MIN
+    }
+
+    /**
+     * 把一次拖拽（或方向键）折算成新的排期。
+     *
+     * - `mode === 'move'`：start 与 end 同时平移 delta（增量已吸附到 30 分钟）
+     * - `mode === 'resize'`：只改 end，且保持「至少 30 分钟」
+     * - 只给了 startTime 的时间点排期：没有真实 end，按 60 分钟计算。整体拖动只写回 startTime
+     *   （不把它偷偷变成时间段）；拖底边才补上 endTime，等于给它定一个真实时长。
+     * - 夹取只在 00:00–24:00 内进行；夹取结果若与拖拽方向相反，按「没动」处理（返回 null）。
+     *
+     * 返回 `{ startTime, endTime }`（`endTime` 为 null = 保持「时间点」），或 `null` 表示
+     * 这一步没有产生任何变化、调用方应跳过提交。
+     */
+    function rescheduleTimes(item, mode, deltaMinutes) {
+      const baseStart = minutesOfTime(item.startTime)
+      if (baseStart === null) return null
+      // 「有没有结束时间」只看字段本身。endTime 是 "24:00" 时 minutesOfTime 读不回来
+      // （splitTimeKey 只认 00:00–23:59），那种情况要按默认时长算，但绝不能把 endTime 丢掉。
+      const hasEnd = asText(item.endTime) !== ''
+      const rawEnd = minutesOfTime(item.endTime)
+      const duration = rawEnd !== null && rawEnd > baseStart ? rawEnd - baseStart : POINT_BLOCK_MIN
+      const delta = Math.round(Number(deltaMinutes) || 0)
+
+      let start
+      let end
+      if (mode === 'resize') {
+        // 结束边不动 start：新 end = 原 end（读不回来时用「原 start + 默认时长」）＋ delta。
+        start = baseStart
+        end = Math.min(DAY_MIN, Math.max(baseStart + SNAP_MIN, baseStart + duration + delta))
+      } else {
+        const requested = baseStart + delta
+        const moved = Math.min(DAY_MIN - duration, Math.max(0, requested))
+        // 夹取绝不能把块往反方向推：往下拖被 24:00 挡住时，宁可什么都不做，
+        // 也不能把 23:30-24:00 的块挪到 23:00（那是往上）。
+        if (delta > 0 && moved < baseStart) return null
+        if (delta < 0 && moved > baseStart) return null
+        start = moved
+        end = moved + duration
+      }
+
+      const startText = timeOfMinutes(start)
+      const endText = timeOfMinutes(end)
+      if (startText === null || endText === null || end <= start) return null
+      if (hasEnd) {
+        if (startText === asText(item.startTime) && endText === asText(item.endTime)) return null
+        return { startTime: startText, endTime: endText }
+      }
+      // 时间点排期（没有 endTime）：拖动只写回 startTime，不把它偷偷变成时间段；
+      // 但「拖底边」是在给它定一个真实时长，这时才允许补上 endTime。
+      if (mode === 'resize') return { startTime: startText, endTime: endText }
+      // 夹到边界后可能又落回原位置（例如 23:30 往下拖：按 60 分钟算放不下，只能回到 23:00），
+      // 那就当没变化，不提交。
+      return startText === asText(item.startTime) ? null : { startTime: startText, endTime: null }
     }
 
     const WEEKDAY_LABELS = {
@@ -1556,13 +1657,17 @@ window.__ModuleLoader__.load({
 
     /**
      * 周视图：所选周的 7 天 × 0-24 时段。
-     * 这是「看排期」的展示视图，不是番茄钟 —— 只读、点击块打开右侧详情。
+     *
+     * 分时网格里的时间块可以拖动改期（整体拖动 = start/end 同时平移；拖底部边缘 = 只改 end），
+     * 每次吸附 30 分钟；提交统一走 `onReschedule(item, next)`，本组件不直接发请求。
+     * 全天带里的胶囊（重复任务、没有时间块的任务）没有时间块，仍然只能点击选中。
+     * 方向键是等价的键盘通道：↑/↓ 平移 30 分钟，Shift+↑/↓ 改时长 30 分钟。
      *
      * 布局要点：星期表头 + 全天带 + 分时网格放在同一个滚动容器里，
      * 表头两行用 position: sticky 吸顶。这样 7 列与左侧时间轴天然对齐，
      * 不会因为滚动条宽度差出十几像素。
      */
-    function WeekView({ t, onSelect, version }) {
+    function WeekView({ t, onSelect, onReschedule, version }) {
       const [mondayKey, setMondayKey] = useState(() => mondayOfKey(dateKeyOf(new Date())))
       const [items, setItems] = useState([])
       const scrollRef = useRef(null)
@@ -1607,7 +1712,8 @@ window.__ModuleLoader__.load({
         const key = asText(item.date)
         if (key === '') continue
         const repeating = item.repeat !== null && item.repeat !== undefined && item.repeat !== false
-        const start = minutesOfTime(item.startTime) ?? minutesOfTime(item.dueTime)
+        // dueTime 在 v4 已废弃且恒为 null，这里只认 startTime。
+        const start = minutesOfTime(item.startTime)
         if (repeating || start === null) (allDayByDate[key] ??= []).push(item)
         else (timedByDate[key] ??= []).push(item)
       }
@@ -1626,6 +1732,130 @@ window.__ModuleLoader__.load({
         if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault?.()
         openItem(item)
+      }
+
+      // --- 时间块拖拽 / 缩放 ---
+      // dragRef 存手势的可变状态（不触发渲染），dragState 只存需要画出来的部分。
+      // 关键点：拖动期间冻结「原始时间」，免得 2.5s 轮询回来的旧数据把块拽回去。
+      const dragRef = useRef(null)
+      const [dragState, setDragState] = useState(null)
+      const [frozenTimes, setFrozenTimes] = useState(() => new Map())
+      const frozenRef = useRef(new Map())
+      // 刚拖完的那一下 pointerup 之后浏览器还会补一个 click；用它挡掉「拖完又选中」。
+      const suppressClickRef = useRef(false)
+
+      // 拖拽期间不跟着轮询走：只在新数据到达（version 变化）时重新冻结一次。
+      useEffect(() => {
+        frozenRef.current = new Map(items.map((item) => [asText(item.todoId), {
+          startTime: asText(item.startTime),
+          endTime: asText(item.endTime),
+        }]))
+        setFrozenTimes(frozenRef.current)
+      }, [items, version])
+
+      const beginDrag = (item, mode) => (event) => {
+        if (event.button !== undefined && event.button !== 0) return
+        const target = event.currentTarget
+        const id = asText(item.todoId)
+        const frozen = frozenRef.current.get(id)
+        // 以「当前画出来的时间」为基准：拖动期间它被冻结，所以不会跟轮询打架。
+        const base = frozen ?? {
+          startTime: asText(item.startTime),
+          endTime: asText(item.endTime),
+        }
+        // 上一次手势遗留的抑制标记不能吃掉这一次的点击。
+        suppressClickRef.current = false
+        dragRef.current = {
+          item,
+          id,
+          mode,
+          pointerId: event.pointerId,
+          startY: event.clientY,
+          active: false,
+          base,
+          preview: null,
+        }
+        // 指针捕获：手势走出块甚至走出 webview 也不会丢 pointermove/pointerup。
+        try { target.setPointerCapture?.(event.pointerId) } catch (err) { /* 不支持就算了 */ }
+      }
+
+      const moveDrag = (event) => {
+        const drag = dragRef.current
+        if (drag === null || event.pointerId !== drag.pointerId) return
+        const dy = event.clientY - drag.startY
+        if (!drag.active) {
+          if (Math.abs(dy) < DRAG_SLOP_PX) return
+          drag.active = true
+        }
+        const next = rescheduleTimes(drag.base, drag.mode, snapMinutes(dy))
+        drag.preview = next
+        setDragState({ id: drag.id, mode: drag.mode, preview: next })
+      }
+
+      const endDrag = () => {
+        const drag = dragRef.current
+        dragRef.current = null
+        setDragState(null)
+        return drag
+      }
+
+      const commitDrag = () => {
+        const drag = endDrag()
+        if (drag === null) return
+        // 没超过阈值 = 点击：交给 onClick 去选中，这里什么都不做。
+        if (!drag.active) return
+        // 真拖过：挡掉浏览器补发的那一下 click，避免「拖完又选中」。
+        suppressClickRef.current = true
+        if (drag.preview === null || typeof onReschedule !== 'function') return
+        // 先解冻，等这次更新的新数据回来（mutate 会 reload + 抬 version）。
+        frozenRef.current.delete(drag.id)
+        setFrozenTimes(new Map(frozenRef.current))
+        Promise.resolve(onReschedule(drag.item, drag.preview)).catch((err) => {
+          console.error('[dsh-sidebar-todo] reschedule failed', err)
+        })
+      }
+
+      // 手势被取消（pointercancel / 丢失捕获）：什么都不提交，块回到原位。
+      const cancelDrag = () => {
+        const drag = endDrag()
+        if (drag !== null && drag.active) suppressClickRef.current = true
+      }
+
+      const handleBlockClick = (item) => {
+        if (suppressClickRef.current) { suppressClickRef.current = false; return }
+        if (dragRef.current !== null) return
+        openItem(item)
+      }
+
+      const blockPointerHandlers = (item, mode) => ({
+        onPointerDown: beginDrag(item, mode),
+        onPointerMove: moveDrag,
+        onPointerUp: commitDrag,
+        onPointerCancel: cancelDrag,
+        onLostPointerCapture: cancelDrag,
+      })
+
+      const blockKeyHandler = (item) => (event) => {
+        if (event.key === 'Escape') { cancelDrag(); return }
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault?.()
+          openItem(item)
+          return
+        }
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+        event.preventDefault?.()
+        if (typeof onReschedule !== 'function') return
+        const step = (event.key === 'ArrowUp' ? -1 : 1) * SNAP_MIN
+        const next = rescheduleTimes(item, event.shiftKey ? 'resize' : 'move', step)
+        if (next === null) return
+        Promise.resolve(onReschedule(item, next)).catch((err) => {
+          console.error('[dsh-sidebar-todo] reschedule failed', err)
+        })
+      }
+
+      const previewOf = (id) => {
+        if (dragState === null || dragState.id !== id) return null
+        return dragState.preview
       }
 
       return h('div', { style: S.weekView },
@@ -1699,32 +1929,54 @@ window.__ModuleLoader__.load({
               },
               layout.blocks.map((block) => {
                 const item = block.item
+                const id = asText(item.todoId)
                 const accent = accentOf(item)
                 const width = 100 / layout.lanes
+                // 拖动中优先画预览位置；没在拖就用（可能被冻结的）存下来的时间。
+                const shown = previewOf(id) ?? frozenTimes.get(id) ?? null
+                const startMin = shown === null ? block.start : (minutesOfTime(shown.startTime) ?? block.start)
+                const rawEnd = shown === null ? null : minutesOfTime(shown.endTime)
+                const endMin = rawEnd !== null && rawEnd > startMin ? rawEnd : startMin + POINT_BLOCK_MIN
+                const dragging = dragState !== null && dragState.id === id
                 return h('div', {
-                  key: `${asText(item.todoId)}-${key}-${block.start}`,
+                  key: `${id}-${key}-${block.start}`,
                   className: 'td-week-item',
                   tabIndex: 0,
                   'aria-label': asText(item.title),
+                  title: t('rescheduleHint'),
                   style: {
                     ...S.weekBlock,
-                    top: (block.start / 60) * HOUR_PX,
-                    height: Math.max(20, ((block.end - block.start) / 60) * HOUR_PX),
+                    top: (startMin / 60) * HOUR_PX,
+                    height: Math.max(20, ((endMin - startMin) / 60) * HOUR_PX),
                     left: `${block.lane * width}%`,
                     width: `${width}%`,
                     background: `color-mix(in srgb, ${accent} 30%, transparent)`,
                     borderLeft: `3px solid ${accent}`,
                     opacity: item.done ? 0.55 : 1,
+                    // 触屏上让竖直拖动归块自己，不要被滚动容器抢走。
+                    touchAction: 'none',
+                    cursor: dragging ? 'grabbing' : 'grab',
+                    zIndex: dragging ? 5 : undefined,
+                    ...(dragging ? S.weekBlockDragging : null),
                   },
-                  onClick: () => openItem(item),
-                  onKeyDown: keyHandler(item),
+                  onClick: () => handleBlockClick(item),
+                  onKeyDown: blockKeyHandler(item),
+                  ...blockPointerHandlers(item, 'move'),
                 },
                 h('span', {
                   style: {
                     display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap', textDecoration: item.done ? 'line-through' : 'none',
                   },
-                }, asText(item.title)))
+                }, asText(item.title)),
+                // 底部 ~6px 的缩放条：按在它上面 = 改时长，按在块的其他地方 = 整体平移。
+                h('div', {
+                  className: 'td-week-resize',
+                  'aria-hidden': 'true',
+                  title: t('resizeHint'),
+                  style: S.weekResize,
+                  ...blockPointerHandlers(item, 'resize'),
+                }))
               }),
               isToday
                 ? h('div', {
@@ -3046,6 +3298,18 @@ window.__ModuleLoader__.load({
         return ok
       }, [selected, mutate])
 
+      // 周视图拖拽/键盘改期：next 只带 startTime / endTime，其余字段由宿主端 patch 合并。
+      // 只给 startTime 的时间点排期拖完仍然是时间点（endTime 传 null，不偷偷变成时间段）。
+      const handleReschedule = useCallback((item, next) => {
+        const id = asText(item?.todoId)
+        if (id === '' || next === null || typeof next !== 'object') return Promise.resolve(false)
+        const patch = {}
+        if (typeof next.startTime === 'string') patch.startTime = next.startTime
+        if ('endTime' in next) patch.endTime = next.endTime === null ? null : asText(next.endTime)
+        if (Object.keys(patch).length === 0) return Promise.resolve(false)
+        return mutate('update', { id, patch })
+      }, [mutate])
+
       // 删除后清空选中，右侧详情面板随之收起（否则会指向一条已不存在的记录）。
       const handleRemoveSelected = useCallback(async () => {
         if (!selected) return
@@ -3145,6 +3409,7 @@ window.__ModuleLoader__.load({
           return h(WeekView, {
             t,
             onSelect: handleSelect,
+            onReschedule: handleReschedule,
             version: dataVersion,
           })
         }
