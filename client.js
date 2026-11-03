@@ -61,7 +61,7 @@ window.__ModuleLoader__.load({
         quadrantEmptyUrgentNotImportant: '交给别人或自己做',
         quadrantEmptyImportantNotUrgent: '规划后再做',
         quadrantEmptyNeither: '有空再做',
-        subtaskAdd: '+添加子计划', subtaskPlaceholder: '输入子计划…',
+        subtaskPlaceholder: '输入子计划…',
         titlePlaceholder: '计划标题',
         notePlaceholder: '选填：这是我要写的书写内容',
         propertyCategory: '计划分类', propertyPriority: '重要优先级',
@@ -160,7 +160,7 @@ window.__ModuleLoader__.load({
         quadrantEmptyUrgentNotImportant: 'Delegate or do it yourself',
         quadrantEmptyImportantNotUrgent: 'Plan then do',
         quadrantEmptyNeither: 'Do when free',
-        subtaskAdd: '+ Add subtask', subtaskPlaceholder: 'Enter subtask…',
+        subtaskPlaceholder: 'Enter subtask…',
         titlePlaceholder: 'Plan title',
         notePlaceholder: 'Optional: write your content here',
         propertyCategory: 'Category', propertyPriority: 'Priority',
@@ -369,7 +369,6 @@ window.__ModuleLoader__.load({
       detailIcon: { width: 24, height: 24, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
       detailTitleInput: { flex: 1, fontSize: 18, fontWeight: 600, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontFamily: 'inherit', outline: 'none', padding: 0, lineHeight: '28px' },
       detailSection: { padding: '0 20px 12px' },
-      subtaskLink: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--dsw-alias-state-business-primary)', cursor: 'pointer', border: 'none', background: 'transparent', padding: '4px 0', fontFamily: 'inherit' },
       subtaskList: { display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 },
       subtaskRow: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 30, padding: '0 4px', borderRadius: 4 },
       subtaskInput: { flex: 1, height: 28, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '0 8px', borderRadius: 4 },
@@ -2890,13 +2889,7 @@ window.__ModuleLoader__.load({
 
         // Subtasks
         h('div', { style: S.detailSection },
-          h('button', {
-            type: 'button',
-            className: 'td-btn',
-            style: S.subtaskLink,
-            onClick: handleAddSubtask,
-          }, t('subtaskAdd')),
-          h('div', { style: { display: 'flex', gap: 6, marginTop: 4 } },
+          h('div', { style: { display: 'flex', gap: 6 } },
             h('input', {
               className: 'td-input',
               style: { ...S.subtaskInput, flex: 1 },
