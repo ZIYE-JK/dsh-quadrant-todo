@@ -1,7 +1,7 @@
 {
   "name": "dsh-sidebar-todo",
-  "version": "0.2.3",
-  "description": "DeepSeek Harness 侧栏待办清单：今天 / 本周 / 逾期 / 积压，支持循环任务、月视图日历与分类，agent 可读写",
+  "version": "0.3.0",
+  "description": "DeepSeek Harness 侧栏待办（本地分支改造）：四象限矩阵 + 收集箱 + 子计划 + 月视图日历 + 循环任务 + 分类图标 + 系统通知 / 飞书通知，agent 可读写",
   "type": "module",
   "license": "MIT",
   "author": "Natte",
@@ -12,7 +12,11 @@
     "todo",
     "todolist",
     "task",
-    "sidebar"
+    "sidebar",
+    "eisenhower",
+    "quadrant",
+    "notification",
+    "feishu"
   ],
   "repository": {
     "type": "git",
@@ -28,9 +32,22 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": ["index.js", "client.js", "lib/**/*.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "docs/**/*.md"
+  ],
   "scripts": { "test": "node --test" },
   "publishConfig": { "access": "public" },
+  "dshLocalFork": {
+    "basedOn": "dsh-sidebar-todo@0.2.3",
+    "upstream": "https://github.com/Natte/dsh-sidebar-todo",
+    "note": "本地分支改造，未发布；npm 原包保持不动，回退只需改回 profile 依赖。"
+  },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-locale"] }
