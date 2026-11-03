@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
         dialogNew: '新建待办', dialogEdit: '编辑待办',
         fieldTitle: '标题', fieldNote: '备注', fieldDate: '日期', fieldTime: '时间',
         fieldPriority: '优先级', fieldCategory: '分类',
-        fieldRepeat: '重复', repeatNone: '不循环', repeatDaily: '每天', repeatWeekly: '每周', repeatMonthly: '每月',
+        fieldRepeat: '重复', repeatNone: '不循环', repeatDaily: '每日', repeatWeekly: '每周', repeatMonthly: '每月',
         fieldWeekdays: '星期', fieldMonthDay: '每月几号', fieldUntil: '结束日期',
         weekdaysRequired: '每周至少选一天',
         mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日',
@@ -49,7 +49,7 @@ window.__ModuleLoader__.load({
         priorityHigh: '高', priorityMedium: '中', priorityLow: '低',
         badResponse: '响应格式不正确', requestFailed: '请求失败', dismiss: '关闭',
         // --- New UI strings ---
-        plan: '做计划', view: '视图', focus: '专注',
+        plan: '做计划', view: '月视图', focus: '周视图',
         inbox: '收集箱', inboxPlaceholder: '添加计划到「收集箱」，回车即可保存',
         all: '全部', uncategorized: '无分类', newCategory: '新建分类',
         monthTitle: '{year}年{month}月', backToToday: '回到今天',
@@ -92,6 +92,17 @@ window.__ModuleLoader__.load({
         allDay: '全天', nowLine: '现在',
         timeRange: '时间段', timeStart: '开始', timeEnd: '结束',
         timeRangeInvalid: '结束时间必须晚于开始时间',
+        // --- v4: 时间单一化 / 完成期限 / 超期处理 / 重复 ---
+        timePoint: '时间点', propertyTime: '时间',
+        deadlineAt: '时限 {time}',
+        dueDialogTitle: '设置计划完成期限',
+        dueThisWeek: '本周内完成', dueThisWorkWeek: '本周工作日内完成', dueCustom: '自定义完成期限',
+        dueCustomRequired: '请先选择自定义完成期限的日期',
+        overdueSection: '超过期限未完成', onOverdueNone: '无操作', onOverdueAbandon: '标记为放弃', abandonedTag: '已放弃',
+        repeatDialogTitle: '设置重复规则', repeatNonePill: '无重复',
+        repeatYearly: '每年', repeatEbbinghaus: '艾宾浩斯记忆曲线', repeatWorkday: '法定工作日',
+        repeatTabDate: '日期', repeatTabWeekday: '星期', repeatEnd: '结束重复',
+        repeatWorkdayHint: '「法定工作日」当前按周一至周五计算；暂无节假日数据。',
       },
       en: {
         nav: 'To-do', title: 'To-do', new: 'New', search: 'Search',
@@ -135,7 +146,7 @@ window.__ModuleLoader__.load({
         priorityHigh: 'High', priorityMedium: 'Medium', priorityLow: 'Low',
         badResponse: 'Unexpected response', requestFailed: 'Request failed', dismiss: 'Dismiss',
         // --- New UI strings ---
-        plan: 'Plan', view: 'View', focus: 'Focus',
+        plan: 'Plan', view: 'Month view', focus: 'Week view',
         inbox: 'Inbox', inboxPlaceholder: 'Add to Inbox, press Enter to save',
         all: 'All', uncategorized: 'No category', newCategory: 'New category',
         monthTitle: '{year} {{month}}', backToToday: 'Back to today',
@@ -178,6 +189,17 @@ window.__ModuleLoader__.load({
         allDay: 'All day', nowLine: 'Now',
         timeRange: 'Time range', timeStart: 'Start', timeEnd: 'End',
         timeRangeInvalid: 'End time must be after start time',
+        // --- v4: single time source / due presets / overdue handling / repeat ---
+        timePoint: 'Time point', propertyTime: 'Time',
+        deadlineAt: 'Due at {time}',
+        dueDialogTitle: 'Set planned due date',
+        dueThisWeek: 'By the end of this week', dueThisWorkWeek: 'By the end of this work week', dueCustom: 'Custom due date',
+        dueCustomRequired: 'Pick a date for the custom due date first',
+        overdueSection: 'If not completed in time', onOverdueNone: 'No action', onOverdueAbandon: 'Mark as abandoned', abandonedTag: 'Abandoned',
+        repeatDialogTitle: 'Repeat rule', repeatNonePill: 'Never',
+        repeatYearly: 'Yearly', repeatEbbinghaus: 'Ebbinghaus curve', repeatWorkday: 'Workdays',
+        repeatTabDate: 'Date', repeatTabWeekday: 'Weekday', repeatEnd: 'End repeat',
+        repeatWorkdayHint: 'Workdays currently means Monday–Friday; no holiday data is available yet.',
       },
     }
     const ORDER = ['overdue', 'today', 'tomorrow', 'week', 'later', 'stale', 'unplanned', 'done']
@@ -377,6 +399,24 @@ window.__ModuleLoader__.load({
       pickerBody: { padding: '2px 0 8px' },
       repeatPickerItem: { display: 'flex', alignItems: 'center', height: 32, padding: '0 8px', border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' },
       repeatPickerItemOn: { background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)' },
+      // v4：完成期限弹窗（单选行）+ 重复弹窗（频率胶囊 / 日期格 / 结束重复行）
+      radioRow: { display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 4px', borderRadius: 6, cursor: 'pointer', fontSize: 13, color: 'var(--dsw-alias-label-primary)' },
+      radioInput: { flex: 'none', width: 14, height: 14, margin: 0, cursor: 'pointer', accentColor: 'var(--dsw-alias-state-business-primary)' },
+      dialogSectionLabel: { marginTop: 12, marginBottom: 2, fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' },
+      duePickerBody: { marginTop: 6, marginBottom: 2 },
+      repeatPillRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+      repeatPill: { height: 30, padding: '0 12px', borderRadius: 15, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' },
+      repeatPillOn: { border: '0.5px solid transparent', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)' },
+      repeatDayGrid: { display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4, marginTop: 8 },
+      repeatDay: { height: 30, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' },
+      repeatDayOn: { background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)' },
+      untilRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--dsw-alias-border-l2)' },
+      powerBtn: { flex: 'none', width: 30, height: 30, padding: 0, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 15, lineHeight: '28px', textAlign: 'center', cursor: 'pointer' },
+      powerBtnOn: { border: '0.5px solid transparent', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)' },
+      untilLabel: { flex: 'none', fontSize: 13, color: 'var(--dsw-alias-label-primary)' },
+      untilValue: { flex: 'none', minWidth: 96, fontSize: 12.5, color: 'var(--dsw-alias-label-secondary)', textAlign: 'right' },
+      untilClear: { flex: 'none', width: 26, height: 26, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 14, lineHeight: '26px', textAlign: 'center', cursor: 'pointer' },
+      untilField: { flex: 'none', width: 150 },
       // Calendar view (standalone)
       calendarView: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '16px 20px', overflowY: 'auto' },
       calendarViewHead: { display: 'flex', alignItems: 'center', gap: 6, height: 32, marginBottom: 12 },
@@ -708,11 +748,108 @@ window.__ModuleLoader__.load({
       return rows
     }
 
+    /**
+     * 「时间」只有一个事实源：时间点 = startTime，时间段 = startTime + endTime。
+     * 行徽标与详情面板都走这里，避免两处各显示一个时间（历史 bug）。
+     */
+    function timeRangeLabel(start, end) {
+      const from = asText(start)
+      const to = asText(end)
+      if (from === '' && to === '') return ''
+      if (from === '') return to
+      if (to === '') return from
+      return `${from}–${to}`
+    }
+
+    function timeLabel(item) {
+      if (item === null || item === undefined) return ''
+      return timeRangeLabel(item.startTime, item.endTime)
+    }
+
+    /** 「什么时候到期」：时间段看结束，时间点看开始；都没有就是 null。 */
+    function deadlineOf(item) {
+      if (item === null || item === undefined) return null
+      const end = asText(item.endTime)
+      if (end !== '') return end
+      const start = asText(item.startTime)
+      if (start !== '') return start
+      return null
+    }
+
+    /** 行尾徽标：日期 + 时间（时间段显示 开始–结束），与右侧详情面板同源。 */
     function dueLabel(item) {
-      const dueDate = asText(item.dueDate)
-      if (dueDate === '') return ''
-      const dueTime = asText(item.dueTime)
-      return dueTime === '' ? dueDate.slice(5) : `${dueDate.slice(5)} ${dueTime}`
+      const date = asText(item.dueDate)
+      const time = timeLabel(item)
+      if (date === '' && time === '') return ''
+      if (date === '') return time
+      const short = date.slice(5)
+      return time === '' ? short : `${short} ${time}`
+    }
+
+    function deadlineTitle(item, t) {
+      const deadline = deadlineOf(item)
+      if (deadline === null) return undefined
+      return String(t('deadlineAt')).replace('{time}', deadline)
+    }
+
+    // --- v4 常量：完成期限预设 / 超期处理 / 重复频率 ---
+    const DUE_PRESETS = ['today', 'this_week', 'this_work_week', 'custom']
+    const OVERDUE_MODES = ['none', 'abandon']
+    const REPEAT_LABEL_KEY = {
+      daily: 'repeatDaily', weekly: 'repeatWeekly', monthly: 'repeatMonthly',
+      yearly: 'repeatYearly', ebbinghaus: 'repeatEbbinghaus', workday: 'repeatWorkday',
+    }
+    const REPEAT_FREQ_PILLS = [
+      ['', 'repeatNonePill'], ['daily', 'repeatDaily'], ['weekly', 'repeatWeekly'],
+      ['monthly', 'repeatMonthly'], ['yearly', 'repeatYearly'],
+      ['ebbinghaus', 'repeatEbbinghaus'], ['workday', 'repeatWorkday'],
+    ]
+
+    /** 完成期限预设 → 具体日期。周一是一周的第一天：周日 = 周一 + 6，周五 = 周一 + 4。 */
+    function presetDateKey(preset, customKey) {
+      const today = new Date()
+      if (preset === 'today') return dateKeyOf(today)
+      if (preset === 'this_week') return shiftKeyLocal(mondayOfKey(dateKeyOf(today)), 6)
+      if (preset === 'this_work_week') return shiftKeyLocal(mondayOfKey(dateKeyOf(today)), 4)
+      if (preset === 'custom') return asText(customKey)
+      return ''
+    }
+
+    /** 存了 duePreset 就用它；只存了日期就回落到 custom；什么都没有则默认「当天」。 */
+    function normalizeDuePreset(preset, dueDate) {
+      if (DUE_PRESETS.includes(preset)) return preset
+      return asText(dueDate) === '' ? 'today' : 'custom'
+    }
+
+    function duePresetLabelKey(preset) {
+      if (preset === 'this_week') return 'dueThisWeek'
+      if (preset === 'this_work_week') return 'dueThisWorkWeek'
+      if (preset === 'custom') return 'dueCustom'
+      return 'dueToday'
+    }
+
+    /** 英文的 weekPrefix 是空串；字典缺键时回落到 key 本身，这里兜一下。 */
+    function weekPrefixOf(t) {
+      const raw = t('weekPrefix')
+      return raw === 'weekPrefix' ? '' : asText(raw)
+    }
+
+    function weekdayLabel(iso, t) {
+      const entry = WEEKDAY_OPTIONS[iso - 1]
+      if (entry === undefined) return String(iso)
+      return weekPrefixOf(t) + t(entry[0])
+    }
+
+    function repeatDisplayLabel(repeat, t) {
+      if (repeat === null || repeat === undefined || typeof repeat !== 'object') return t('repeatNoneShort')
+      const key = REPEAT_LABEL_KEY[repeat.freq]
+      if (key === undefined) return t('repeatNoneShort')
+      const parts = [t(key)]
+      if (repeat.freq === 'weekly' && Array.isArray(repeat.weekdays) && repeat.weekdays.length > 0) {
+        parts.push(repeat.weekdays.slice().sort((left, right) => left - right).map((iso) => weekdayLabel(iso, t)).join(' '))
+      }
+      if (asText(repeat.until) !== '') parts.push(`${t('until')} ${repeat.until}`)
+      return parts.join(' · ')
     }
 
     const DATE_POP = { width: 272, height: 360 }
@@ -1960,10 +2097,12 @@ window.__ModuleLoader__.load({
       // 循环任务以本周期实例为准：dueDate 为空说明系列已结束，
       // 复选框置灰且不响应（与 handleToggle 的提前 return 保持一致）。
       const ended = Boolean(item.isRepeating) && asText(item.dueDate) === ''
+      // 已放弃：仍留在板上，但压暗并挂一个标记，避免看起来像还没开始的普通任务。
+      const given = item.abandoned === true
       return h('div', {
         key: item.id,
         className: 'td-todo-row',
-        style: selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow,
+        style: { ...(selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow), ...(given ? { opacity: 0.55 } : null) },
         onClick: () => onSelect(item.id),
       },
       checkHit(
@@ -1994,7 +2133,19 @@ window.__ModuleLoader__.load({
         style: done ? S.todoTitleDone : S.todoTitle,
         onClick: (e) => { e.stopPropagation(); onSelect(item.id) },
       }, asText(item.title)),
-      h('span', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }, dueLabel(item)))
+      given
+        ? h('span', {
+            style: {
+              flex: 'none', fontSize: 10, lineHeight: '16px', padding: '0 6px', borderRadius: 8,
+              border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-tertiary)',
+            },
+          }, t('abandonedTag'))
+        : null,
+      // 行尾徽标与右侧详情面板的「时间」同源（startTime / startTime–endTime）。
+      h('span', {
+        style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', flex: 'none' },
+        title: deadlineTitle(item, t),
+      }, dueLabel(item)))
     }
 
     function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd }) {
@@ -2067,29 +2218,260 @@ window.__ModuleLoader__.load({
               : items.map((item) => h(TodoRow, { key: item.id, t, item, selectedId, onSelect, onToggle })))))
     }
 
+    /** Esc 关闭：弹窗自己挂 document 监听，避免每个组件抄一遍。 */
+    function useEscapeKey(onClose, active) {
+      const closeRef = useRef(onClose)
+      useEffect(() => { closeRef.current = onClose }, [onClose])
+      useEffect(() => {
+        if (active === false) return undefined
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') return
+          event.stopPropagation?.()
+          closeRef.current()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+      }, [active])
+    }
+
+    /**
+     * 完成期限：四个预设（当天 / 本周内 / 本周工作日内 / 自定义）+ 超期处理。
+     * 保存时把 { dueDate, duePreset, onOverdue } 三件一起交回详情面板。
+     */
+    function DueDialog({ t, dueDate, duePreset, onOverdue, onClose, onSave }) {
+      const [preset, setPreset] = useState(() => normalizeDuePreset(duePreset, dueDate))
+      const [customDate, setCustomDate] = useState(() => asText(dueDate))
+      const [overdue, setOverdue] = useState(() => (OVERDUE_MODES.includes(onOverdue) ? onOverdue : 'none'))
+      const [error, setError] = useState(null)
+
+      useEscapeKey(onClose, true)
+
+      const submit = () => {
+        const nextDate = presetDateKey(preset, customDate)
+        // 自定义但没挑日期：宿主只认具体日期，这里先拦一下并给出原因。
+        if (nextDate === '') {
+          setError(t('dueCustomRequired'))
+          return
+        }
+        onSave({ dueDate: nextDate, duePreset: preset, onOverdue: overdue })
+      }
+
+      const radio = (name, value, checked, label, onChange) => h('label', { key: value, style: S.radioRow },
+        h('input', { type: 'radio', name, value, checked, style: S.radioInput, onChange }),
+        h('span', null, label))
+
+      return h('div', {
+        className: 'td-overlay',
+        style: S.overlay,
+        onClick: (event) => { if (event.target === event.currentTarget) onClose() },
+      },
+      h('div', { className: 'td-dialog', style: { ...S.dialog, width: 420 }, role: 'dialog', 'aria-modal': 'true', 'aria-label': t('dueDialogTitle') },
+        h('div', { style: S.dialogHead }, t('dueDialogTitle')),
+        h('div', { role: 'radiogroup', 'aria-label': t('dueDialogTitle') },
+          DUE_PRESETS.map((value) => radio(
+            'td-due-preset',
+            value,
+            preset === value,
+            t(duePresetLabelKey(value)),
+            () => { setPreset(value); setError(null) },
+          ))),
+        preset === 'custom'
+          ? h('div', { style: S.duePickerBody },
+              h(DateField, { t, value: customDate, onChange: (next) => { setCustomDate(next); setError(null) } }))
+          : null,
+        h('div', { style: S.dialogSectionLabel }, t('overdueSection')),
+        h('div', { role: 'radiogroup', 'aria-label': t('overdueSection') },
+          OVERDUE_MODES.map((value) => radio(
+            'td-overdue-mode',
+            value,
+            overdue === value,
+            t(value === 'abandon' ? 'onOverdueAbandon' : 'onOverdueNone'),
+            () => setOverdue(value),
+          ))),
+        error !== null ? h('div', { style: S.dialogError }, error) : null,
+        h('div', { style: S.dialogFoot },
+          h('button', {
+            type: 'button',
+            className: 'td-btn',
+            style: S.btnGhost,
+            onClick: () => onSave({ dueDate: null, duePreset: null, onOverdue: overdue }),
+          }, t('clearValue')),
+          h('button', { type: 'button', className: 'td-btn', style: S.btnGhost, onClick: onClose }, t('cancel')),
+          h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
+    }
+
+    /**
+     * 重复规则：7 个频率胶囊 + 日期 / 星期 分段 + 结束重复。
+     * 保存时把整个 repeat 对象（无重复 → null）交回详情面板。
+     */
+    function RepeatDialog({ t, repeat, dueDate, onClose, onSave }) {
+      const source = repeat !== null && repeat !== undefined && typeof repeat === 'object' ? repeat : null
+      const [freq, setFreq] = useState(() => (source !== null && REPEAT_LABEL_KEY[source.freq] !== undefined ? source.freq : ''))
+      const [tab, setTab] = useState(() => (source !== null && source.freq === 'weekly' ? 'weekday' : 'date'))
+      const [weekdays, setWeekdays] = useState(() => (source !== null && Array.isArray(source.weekdays)
+        ? source.weekdays.filter((day) => Number.isInteger(day) && day >= 1 && day <= 7)
+        : []))
+      const [monthDay, setMonthDay] = useState(() => {
+        if (source !== null && Number.isInteger(source.monthDay)) return source.monthDay
+        const at = parseDateKey(asText(dueDate)) ?? new Date()
+        return at.getDate()
+      })
+      const [untilOn, setUntilOn] = useState(() => source !== null && asText(source.until) !== '')
+      const [until, setUntil] = useState(() => (source !== null ? asText(source.until) : ''))
+      const [error, setError] = useState(null)
+
+      useEscapeKey(onClose, true)
+
+      const pickFreq = (next) => {
+        setError(null)
+        setFreq(next)
+        // 频率决定默认看哪一块：weekly → 星期；monthly / yearly → 日期。
+        if (next === 'weekly') {
+          setTab('weekday')
+          setWeekdays((prev) => (prev.length === 0 ? [1, 2, 3, 4, 5] : prev))
+        } else if (next === 'monthly' || next === 'yearly') {
+          setTab('date')
+        }
+      }
+
+      const toggleWeekday = (iso) => {
+        setError(null)
+        setWeekdays((prev) => (prev.includes(iso) ? prev.filter((day) => day !== iso) : [...prev, iso].sort((left, right) => left - right)))
+      }
+
+      const toggleUntil = () => {
+        if (untilOn) { setUntilOn(false); return }
+        // 打开「结束重复」时给个一年后的默认值，用户再自己调。
+        if (until === '') {
+          const at = new Date()
+          setUntil(dateKeyOf(new Date(at.getFullYear() + 1, at.getMonth(), at.getDate())))
+        }
+        setUntilOn(true)
+      }
+
+      const submit = () => {
+        if (freq === '') { onSave(null); return }
+        // 宿主对 weekly 要求 weekdays 非空（否则直接抛 weekdays 不能为空）。
+        if (freq === 'weekly' && weekdays.length === 0) { setError(t('weekdaysRequired')); return }
+        const next = { freq, interval: 1, until: untilOn && until !== '' ? until : null }
+        if (freq === 'weekly') next.weekdays = weekdays.slice().sort((left, right) => left - right)
+        if (freq === 'monthly' || freq === 'yearly') next.monthDay = monthDay
+        onSave(next)
+      }
+
+      const showGrid = freq === 'weekly' || freq === 'monthly' || freq === 'yearly'
+
+      return h('div', {
+        className: 'td-overlay',
+        style: S.overlay,
+        onClick: (event) => { if (event.target === event.currentTarget) onClose() },
+      },
+      h('div', { className: 'td-dialog', style: S.dialog, role: 'dialog', 'aria-modal': 'true', 'aria-label': t('repeatDialogTitle') },
+        h('div', { style: S.repeatPillRow, role: 'group', 'aria-label': t('repeatDialogTitle') },
+          REPEAT_FREQ_PILLS.map(([value, key]) => h('button', {
+            key: value === '' ? 'none' : value,
+            type: 'button',
+            className: 'td-btn',
+            'aria-pressed': freq === value ? 'true' : 'false',
+            style: { ...S.repeatPill, ...(freq === value ? S.repeatPillOn : null) },
+            onClick: () => pickFreq(value),
+          }, t(key)))),
+
+        showGrid
+          ? h('div', { style: { marginTop: 14 } },
+              h('div', { style: { ...S.seg, maxWidth: 220 } },
+                h('button', {
+                  type: 'button', className: 'td-btn',
+                  'aria-pressed': tab === 'date' ? 'true' : 'false',
+                  style: { ...S.segItem, ...(tab === 'date' ? S.segItemOn : null) },
+                  onClick: () => setTab('date'),
+                }, t('repeatTabDate')),
+                h('button', {
+                  type: 'button', className: 'td-btn',
+                  'aria-pressed': tab === 'weekday' ? 'true' : 'false',
+                  style: { ...S.segItem, ...(tab === 'weekday' ? S.segItemOn : null) },
+                  onClick: () => setTab('weekday'),
+                }, t('repeatTabWeekday'))),
+              tab === 'weekday'
+                ? h('div', { style: { ...S.seg, marginTop: 8 } }, WEEKDAY_OPTIONS.map(([key, iso]) => h('button', {
+                    key: iso,
+                    type: 'button',
+                    className: 'td-btn',
+                    'aria-pressed': weekdays.includes(iso) ? 'true' : 'false',
+                    style: { ...S.segItem, ...(weekdays.includes(iso) ? S.segItemOn : null) },
+                    onClick: () => toggleWeekday(iso),
+                  }, weekdayLabel(iso, t))))
+                : h('div', { style: S.repeatDayGrid }, MONTH_DAYS.map((day) => h('button', {
+                    key: day,
+                    type: 'button',
+                    className: 'td-btn',
+                    'aria-pressed': monthDay === day ? 'true' : 'false',
+                    style: { ...S.repeatDay, ...(monthDay === day ? S.repeatDayOn : null) },
+                    onClick: () => { setMonthDay(day); setError(null) },
+                  }, String(day)))))
+          : null,
+
+        freq === 'workday' ? h('div', { style: S.hint }, t('repeatWorkdayHint')) : null,
+
+        h('div', { style: S.untilRow },
+          h('button', {
+            type: 'button',
+            className: 'td-btn',
+            style: untilOn ? { ...S.powerBtn, ...S.powerBtnOn } : S.powerBtn,
+            'aria-pressed': untilOn ? 'true' : 'false',
+            'aria-label': t('repeatEnd'),
+            title: t('repeatEnd'),
+            onClick: toggleUntil,
+          }, '⏻'),
+          h('span', { style: S.untilLabel }, t('repeatEnd')),
+          h('span', { style: { flex: 1, minWidth: 0 } }),
+          untilOn
+            ? h('div', { style: S.untilField },
+                h(DateField, { t, value: until, onChange: (next) => { setUntil(next); setError(null) } }))
+            : h('span', { style: S.untilValue }, t('dueNone')),
+          untilOn && until !== ''
+            ? h('button', {
+                type: 'button',
+                className: 'td-btn',
+                style: S.untilClear,
+                'aria-label': t('clearValue'),
+                title: t('clearValue'),
+                onClick: () => setUntil(''),
+              }, '⊗')
+            : null),
+
+        error !== null ? h('div', { style: S.dialogError }, error) : null,
+        h('div', { style: S.dialogFoot },
+          h('button', { type: 'button', className: 'td-btn', style: S.btnGhost, onClick: onClose }, t('cancel')),
+          h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
+    }
+
     function DetailPanel({ t, item, categories, onManageCategories, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove }) {
       const [title, setTitle] = useState(asText(item.title))
       const [note, setNote] = useState(asText(item.note))
       const [category, setCategory] = useState(asText(item.category))
       const [quadrant, setQuadrant] = useState(item.quadrant ?? null)
       const [dueDate, setDueDate] = useState(asText(item.dueDate))
-      const [dueTime, setDueTime] = useState(asText(item.dueTime))
+      const [duePreset, setDuePreset] = useState(() => (asText(item.dueDate) === '' ? null : normalizeDuePreset(item.duePreset, item.dueDate)))
+      const [onOverdue, setOnOverdue] = useState(() => (OVERDUE_MODES.includes(item.onOverdue) ? item.onOverdue : 'none'))
       const [startTime, setStartTime] = useState(asText(item.startTime))
       const [endTime, setEndTime] = useState(asText(item.endTime))
+      // 时间点 / 时间段：有结束时间就是时间段，否则是时间点。
+      const [timeMode, setTimeMode] = useState(() => (asText(item.endTime) === '' ? 'point' : 'range'))
       const [repeat, setRepeat] = useState(item.repeat ?? null)
       const [subtaskInput, setSubtaskInput] = useState('')
       const [showCategoryPicker, setShowCategoryPicker] = useState(false)
       const [showQuadrantPicker, setShowQuadrantPicker] = useState(false)
-      const [showDatePicker, setShowDatePicker] = useState(false)
-      const [showRepeatPicker, setShowRepeatPicker] = useState(false)
+      const [showRepeatDialog, setShowRepeatDialog] = useState(false)
       const [showTimePicker, setShowTimePicker] = useState(false)
-      // 同一时刻只开一个属性选择器，避免弹层互相叠着。
+      const [showDueDialog, setShowDueDialog] = useState(false)
+      // 同一时刻只开一个属性选择器 / 弹窗，避免弹层互相叠着。
       const openPicker = (which) => {
         setShowCategoryPicker(which === 'category' ? !showCategoryPicker : false)
         setShowQuadrantPicker(which === 'quadrant' ? !showQuadrantPicker : false)
-        setShowDatePicker(which === 'date' ? !showDatePicker : false)
-        setShowRepeatPicker(which === 'repeat' ? !showRepeatPicker : false)
         setShowTimePicker(which === 'time' ? !showTimePicker : false)
+        setShowDueDialog(which === 'due' ? !showDueDialog : false)
+        setShowRepeatDialog(which === 'repeat' ? !showRepeatDialog : false)
       }
       // 属性行：左标签 / 右值 + 箭头；点整行开合对应选择器。键盘可达。
       const propRow = (label, value, which) => h('div', {
@@ -2120,9 +2502,11 @@ window.__ModuleLoader__.load({
           setCategory(asText(item.category))
           setQuadrant(item.quadrant ?? null)
           setDueDate(asText(item.dueDate))
-          setDueTime(asText(item.dueTime))
+          setDuePreset(asText(item.dueDate) === '' ? null : normalizeDuePreset(item.duePreset, item.dueDate))
+          setOnOverdue(OVERDUE_MODES.includes(item.onOverdue) ? item.onOverdue : 'none')
           setStartTime(asText(item.startTime))
           setEndTime(asText(item.endTime))
+          setTimeMode(asText(item.endTime) === '' ? 'point' : 'range')
           setRepeat(item.repeat ?? null)
         }
       }, [item])
@@ -2161,15 +2545,17 @@ window.__ModuleLoader__.load({
             setTimeout(() => setSavedMsg(null), 3000)
             return
           }
+          // dueTime 已废弃：只写 startTime（时间点）/ startTime + endTime（时间段）。
           const payload = {
             title: title.trim() || asText(item.title),
             note: note.trim(),
             category: category.trim() === '' ? null : category.trim(),
             quadrant: quadrant || null,
             dueDate: dueDate === '' ? null : dueDate,
-            dueTime: dueTime === '' ? null : dueTime,
+            duePreset: dueDate === '' ? null : normalizeDuePreset(duePreset, dueDate),
+            onOverdue,
             startTime: startTime === '' ? null : startTime,
-            endTime: endTime === '' ? null : endTime,
+            endTime: timeMode === 'range' && endTime !== '' ? endTime : null,
             repeat: repeat || null,
           }
           const ok = await onSave(payload)
@@ -2203,22 +2589,18 @@ window.__ModuleLoader__.load({
         if (dueDate === '') return t('dueNone')
         const today = dateKeyOf(new Date())
         if (dueDate === today) return t('dueToday')
-        return dueDate + (dueTime !== '' ? ' ' + dueTime : '')
+        return dueDate
       }
 
-      const repeatDisplay = () => {
-        if (!repeat) return t('repeatNoneShort')
-        if (repeat.freq === 'daily') return t('repeatDaily')
-        if (repeat.freq === 'weekly') return t('repeatWeekly')
-        if (repeat.freq === 'monthly') return t('repeatMonthly')
-        return t('repeatNoneShort')
-      }
+      const repeatDisplay = () => repeatDisplayLabel(repeat, t)
 
-      // 时间段：开始/结束都空才算「未设置」，只填一边也照样显示出来。
+      // 时间行与矩阵行徽标同源：开始 = startTime，结束 = endTime（时段才有）。
       const timeDisplay = () => {
-        const parts = [startTime, endTime].filter((value) => value !== '')
-        return parts.length === 0 ? t('dueNone') : parts.join(' – ')
+        const label = timeRangeLabel(startTime, timeMode === 'range' ? endTime : '')
+        return label === '' ? t('dueNone') : label
       }
+
+      const timeInvalid = startTime !== '' && timeMode === 'range' && endTime !== '' && endTime <= startTime
 
       return h('div', { style: S.detailPanel },
         // Header
@@ -2327,55 +2709,84 @@ window.__ModuleLoader__.load({
                 t(qItem.labelKey))))
             : null,
 
-          propRow(t('propertyDueDate'), dueDisplay(), 'date'),
-          showDatePicker
-            ? h('div', { style: S.pickerBody },
-                h(DateField, {
-                  t,
-                  value: dueDate,
-                  onChange: (next) => { setDueDate(next); markDirty() },
-                }))
+          propRow(t('propertyDueDate'), dueDisplay(), 'due'),
+          showDueDialog
+            ? h(DueDialog, {
+                t,
+                dueDate,
+                duePreset,
+                onOverdue,
+                onClose: () => setShowDueDialog(false),
+                onSave: (next) => {
+                  setDueDate(next.dueDate === null ? '' : next.dueDate)
+                  setDuePreset(next.duePreset)
+                  setOnOverdue(next.onOverdue)
+                  setShowDueDialog(false)
+                  markDirty()
+                },
+              })
             : null,
 
-          propRow(t('timeRange'), timeDisplay(), 'time'),
+          propRow(t('propertyTime'), timeDisplay(), 'time'),
           showTimePicker
             ? h('div', { style: S.pickerBody },
-                h('div', { style: S.fieldRow },
-                  h('div', { style: { ...S.field, flex: '1 1 0' } },
-                    h('span', { style: S.fieldLabel }, t('timeStart')),
-                    h(TimeField, {
-                      t,
-                      value: startTime,
-                      onChange: (next) => { setStartTime(next); markDirty() },
-                    })),
-                  h('div', { style: { ...S.field, flex: '1 1 0' } },
-                    h('span', { style: S.fieldLabel }, t('timeEnd')),
-                    h(TimeField, {
-                      t,
-                      value: endTime,
-                      onChange: (next) => { setEndTime(next); markDirty() },
-                    }))),
-                h('button', {
-                  type: 'button', className: 'td-btn', style: S.pickerClear,
-                  onClick: () => { setStartTime(''); setEndTime(''); markDirty() },
-                }, t('clearValue')))
+                h('div', { style: S.seg },
+                  h('button', {
+                    type: 'button', className: 'td-btn',
+                    'aria-pressed': timeMode === 'point' ? 'true' : 'false',
+                    style: { ...S.segItem, ...(timeMode === 'point' ? S.segItemOn : null) },
+                    // 切到时间点：开始 = 时限 = 这个时刻，endTime 必须一起清掉。
+                    onClick: () => { setTimeMode('point'); setEndTime(''); markDirty() },
+                  }, t('timePoint')),
+                  h('button', {
+                    type: 'button', className: 'td-btn',
+                    'aria-pressed': timeMode === 'range' ? 'true' : 'false',
+                    style: { ...S.segItem, ...(timeMode === 'range' ? S.segItemOn : null) },
+                    onClick: () => setTimeMode('range'),
+                  }, t('timeRange'))),
+                h('div', { style: { marginTop: 8 } },
+                  timeMode === 'point'
+                    ? h(TimeField, {
+                        t,
+                        value: startTime,
+                        onChange: (next) => { setStartTime(next); setEndTime(''); markDirty() },
+                      })
+                    : h('div', null,
+                        h('div', { style: S.fieldRow },
+                          h('div', { style: { ...S.field, flex: '1 1 0' } },
+                            h('span', { style: S.fieldLabel }, t('timeStart')),
+                            h(TimeField, {
+                              t,
+                              value: startTime,
+                              onChange: (next) => { setStartTime(next); markDirty() },
+                            })),
+                          h('div', { style: { ...S.field, flex: '1 1 0' } },
+                            h('span', { style: S.fieldLabel }, t('timeEnd')),
+                            h(TimeField, {
+                              t,
+                              value: endTime,
+                              onChange: (next) => { setEndTime(next); markDirty() },
+                            }))),
+                        h('button', {
+                          type: 'button', className: 'td-btn', style: S.pickerClear,
+                          onClick: () => { setStartTime(''); setEndTime(''); markDirty() },
+                        }, t('clearValue')))),
+                timeInvalid ? h('div', { style: S.dialogError }, t('timeRangeInvalid')) : null)
             : null,
 
           propRow(t('propertyRepeat'), repeatDisplay(), 'repeat'),
-          showRepeatPicker
-            ? h('div', { style: S.repeatPicker },
-                [['', 'repeatNone'], ['daily', 'repeatDaily'], ['weekly', 'repeatWeekly'], ['monthly', 'repeatMonthly']].map(([value, key]) =>
-                  h('button', {
-                    key: value === '' ? 'none' : value,
-                    type: 'button',
-                    className: 'td-btn',
-                    style: { ...S.repeatPickerItem, ...(repeat?.freq === value ? S.repeatPickerItemOn : null) },
-                    onClick: () => {
-                      setRepeat(value === '' ? null : { freq: value, interval: 1, until: null, weekdays: value === 'weekly' ? [1, 2, 3, 4, 5] : null, monthDay: value === 'monthly' ? new Date().getDate() : null })
-                      setShowRepeatPicker(false)
-                      markDirty()
-                    },
-                  }, t(key))))
+          showRepeatDialog
+            ? h(RepeatDialog, {
+                t,
+                repeat,
+                dueDate,
+                onClose: () => setShowRepeatDialog(false),
+                onSave: (next) => {
+                  setRepeat(next)
+                  setShowRepeatDialog(false)
+                  markDirty()
+                },
+              })
             : null),
 
         // Save button
@@ -2609,7 +3020,8 @@ window.__ModuleLoader__.load({
             quadrant: null,
             category: parsed.category || null,
             dueDate: parsed.dueDate || null,
-            dueTime: parsed.dueTime || null,
+            // parse 识别到的时间走旧别名 dueTime，这里并进 startTime；不再写 dueTime。
+            startTime: parsed.startTime || parsed.dueTime || null,
             repeat: parsed.repeat || null,
           }
           await mutate('create', payload)
@@ -2864,9 +3276,9 @@ window.__ModuleLoader__.load({
         title: editing ? asText(initial.title) : '',
         note: editing ? asText(initial.note) : '',
         dueDate: editing ? asText(initial.dueDate) : (asText(initial?.dueDate) || dateKeyOf(new Date())),
-        dueTime: editing ? asText(initial.dueTime) : '',
         startTime: editing ? asText(initial.startTime) : '',
         endTime: editing ? asText(initial.endTime) : '',
+        timeMode: editing && asText(initial.endTime) !== '' ? 'range' : 'point',
         priority: editing && ['high', 'medium', 'low'].includes(initial.priority) ? initial.priority : null,
         category: editing ? asText(initial.category) : '',
         quadrant: editing && QUADRANT_MAP[initial.quadrant] ? initial.quadrant : (initial?.quadrant ?? null),
@@ -2924,9 +3336,10 @@ window.__ModuleLoader__.load({
                 ...prev,
                 title: parsed.title || prev.title,
                 dueDate: parsed.dueDate || prev.dueDate,
-                dueTime: parsed.dueTime || prev.dueTime,
-                startTime: parsed.startTime || prev.startTime,
-                endTime: parsed.endTime || prev.endTime,
+                // parse 把识别到的时间放在 dueTime 这个旧别名上，这里并进 startTime。
+                startTime: parsed.startTime || parsed.dueTime || prev.startTime,
+                // 时间点模式下开始即时限，不能再留一个结束时间。
+                endTime: prev.timeMode === 'point' ? '' : (parsed.endTime || prev.endTime),
                 priority: parsed.priority ?? prev.priority,
                 category: parsed.category || prev.category,
                 quadrant: parsed.quadrant ?? prev.quadrant,
@@ -2948,7 +3361,7 @@ window.__ModuleLoader__.load({
           setError(t('weekdaysRequired'))
           return
         }
-        if (form.startTime !== '' && form.endTime !== '' && form.endTime <= form.startTime) {
+        if (form.startTime !== '' && form.timeMode === 'range' && form.endTime !== '' && form.endTime <= form.startTime) {
           setError(t('timeRangeInvalid'))
           return
         }
@@ -2957,9 +3370,9 @@ window.__ModuleLoader__.load({
           title,
           note: form.note,
           dueDate: form.dueDate || null,
-          dueTime: form.dueTime || null,
+          // dueTime 是已废弃的别名：只写 startTime / endTime。
           startTime: form.startTime || null,
-          endTime: form.endTime || null,
+          endTime: form.timeMode === 'range' && form.endTime !== '' ? form.endTime : null,
           priority: form.priority || null,
           category: category === '' ? null : category,
           quadrant: form.quadrant || null,
@@ -3028,39 +3441,59 @@ window.__ModuleLoader__.load({
             onChange: (e) => setForm((prev) => ({ ...prev, note: e.target.value })),
           })),
 
-        h('div', { style: S.fieldRow },
-          h('div', { style: S.field },
-            h('span', { style: S.fieldLabel }, t('fieldDate')),
-            h(DateField, {
-              t,
-              value: form.dueDate,
-              onChange: (next) => setForm((prev) => ({ ...prev, dueDate: next })),
-            })),
-          h('div', { style: S.field },
-            h('span', { style: S.fieldLabel }, t('fieldTime')),
-            h(TimeField, {
-              t,
-              value: form.dueTime,
-              onChange: (next) => setForm((prev) => ({ ...prev, dueTime: next })),
-            }))),
-
         h('div', { style: S.field },
-          h('span', { style: S.fieldLabel }, t('timeRange')),
-          h('div', { style: S.fieldRow },
-            h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
-              h('span', { style: S.fieldLabel }, t('timeStart')),
-              h(TimeField, {
-                t,
-                value: form.startTime,
-                onChange: (next) => setForm((prev) => ({ ...prev, startTime: next })),
-              })),
-            h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
-              h('span', { style: S.fieldLabel }, t('timeEnd')),
-              h(TimeField, {
-                t,
-                value: form.endTime,
-                onChange: (next) => setForm((prev) => ({ ...prev, endTime: next })),
-              })))),
+          h('span', { style: S.fieldLabel }, t('fieldDate')),
+          h(DateField, {
+            t,
+            value: form.dueDate,
+            onChange: (next) => setForm((prev) => ({ ...prev, dueDate: next })),
+          })),
+
+        // 时间：时间点 = 只填开始（开始即时限）；时间段 = 开始 + 结束。
+        h('div', { style: S.field },
+          h('span', { style: S.fieldLabel }, t('propertyTime')),
+          h('div', { style: S.seg },
+            h('button', {
+              type: 'button',
+              className: 'td-btn',
+              'aria-pressed': form.timeMode === 'point' ? 'true' : 'false',
+              style: { ...S.segItem, ...(form.timeMode === 'point' ? S.segItemOn : null) },
+              onClick: () => setForm((prev) => ({ ...prev, timeMode: 'point', endTime: '' })),
+            }, t('timePoint')),
+            h('button', {
+              type: 'button',
+              className: 'td-btn',
+              'aria-pressed': form.timeMode === 'range' ? 'true' : 'false',
+              style: { ...S.segItem, ...(form.timeMode === 'range' ? S.segItemOn : null) },
+              onClick: () => setForm((prev) => ({ ...prev, timeMode: 'range' })),
+            }, t('timeRange'))),
+          h('div', { style: { marginTop: 8 } },
+            form.timeMode === 'point'
+              ? h(TimeField, {
+                  t,
+                  value: form.startTime,
+                  onChange: (next) => setForm((prev) => ({ ...prev, startTime: next, endTime: '' })),
+                })
+              : h('div', null,
+                  h('div', { style: S.fieldRow },
+                    h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
+                      h('span', { style: S.fieldLabel }, t('timeStart')),
+                      h(TimeField, {
+                        t,
+                        value: form.startTime,
+                        onChange: (next) => setForm((prev) => ({ ...prev, startTime: next })),
+                      })),
+                    h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
+                      h('span', { style: S.fieldLabel }, t('timeEnd')),
+                      h(TimeField, {
+                        t,
+                        value: form.endTime,
+                        onChange: (next) => setForm((prev) => ({ ...prev, endTime: next })),
+                      }))),
+                  h('button', {
+                    type: 'button', className: 'td-btn', style: S.pickerClear,
+                    onClick: () => setForm((prev) => ({ ...prev, startTime: '', endTime: '' })),
+                  }, t('clearValue'))))),
 
         h('div', { style: S.field },
           h('span', { style: S.fieldLabel }, t('fieldPriority')),
