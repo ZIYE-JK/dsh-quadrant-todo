@@ -319,9 +319,6 @@ window.__ModuleLoader__.load({
       // 矩阵行的圆形状态图标：未完成 = 红圈，已完成 = 绿底白勾
       todoCircle: { width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #f07080', flex: 'none', background: 'transparent', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' },
       todoCircleDone: { width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #7fc9a0', flex: 'none', background: '#7fc9a0', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-      // 顶栏/左栏的已生效筛选胶囊
-      chip: { display: 'inline-flex', alignItems: 'center', gap: 4, height: 20, padding: '0 8px', borderRadius: 10, fontSize: 11, background: 'var(--dsw-alias-interactive-bg-hover)', color: 'var(--dsw-alias-label-secondary)' },
-      chipBtn: { border: 'none', background: 'transparent', color: 'inherit', fontSize: 12, lineHeight: 1, cursor: 'pointer', padding: 0 },
       todoTitle: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 },
       todoTitleDone: { textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' },
       // Detail panel
@@ -2201,7 +2198,7 @@ window.__ModuleLoader__.load({
           }, '📅')))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, onToggleInboxCollapse, collapsedInbox, monthCursor, onMonthChange, calendarItems, onSelectDay, dayFilter, onClearDayFilter }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, onToggleInboxCollapse, collapsedInbox, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
       const [selectedDay, setSelectedDay] = useState(null)
       const cells = monthGrid(monthCursor.year, monthCursor.month)
       const monthKey = `${monthCursor.year}-${String(monthCursor.month + 1).padStart(2, '0')}`
@@ -2269,18 +2266,6 @@ window.__ModuleLoader__.load({
               style: { ...S.btnGhost, height: 22, padding: '0 8px', fontSize: 11 },
               onClick: () => { onMonthChange(0); handleDayClick(todayKey) },
             }, t('backToToday'))),
-          dayFilter !== null
-            ? h('div', { style: { display: 'flex', justifyContent: 'center', marginBottom: 4 } },
-                h('span', { style: S.chip },
-                  dayFilter.slice(5) + ' ',
-                  h('button', {
-                    type: 'button',
-                    className: 'td-btn',
-                    style: S.chipBtn,
-                    'aria-label': t('clearValue'),
-                    onClick: onClearDayFilter,
-                  }, '×')))
-            : null,
           h('div', { style: S.calendarGrid, 'aria-hidden': 'true' },
             weekdays.map((label, index) => h('div', { key: String(index), style: S.calendarWeekday }, label))),
           h('div', { style: S.calendarGrid },
@@ -3353,8 +3338,8 @@ window.__ModuleLoader__.load({
         }
       }, [reload, retrying])
 
-      // 点某天 = 只看那天的计划（再点一次取消）。左栏会显示一枚可清除的胶囊，
-      // 免得用户以为待办凭空消失。
+      // 点某天 = 只看那天的计划（再点一次取消）。选中的格子本身会高亮，
+      // 不再额外挂一枚「11-03 ×」胶囊——那是重复信息，用户明确说没必要。
       const handleSelectDay = (dayKey) => {
         setDayFilter((prev) => (prev === dayKey ? null : dayKey))
       }
@@ -3466,8 +3451,6 @@ window.__ModuleLoader__.load({
             onMonthChange: handleMonthChange,
             calendarItems,
             onSelectDay: handleSelectDay,
-            dayFilter,
-            onClearDayFilter: () => setDayFilter(null),
           }),
           activeRailContent(),
           selectedItem
