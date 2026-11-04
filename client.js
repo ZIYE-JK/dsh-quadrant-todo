@@ -11,7 +11,7 @@ window.__ModuleLoader__.load({
         nav: '待办', title: '待办', new: '新建', search: '搜索待办',
         today: '今天', overdue: '逾期', tomorrow: '明天', week: '本周', month: '本月', later: '以后', stale: '积压',
         unplanned: '未排期', done: '已完成', doneEmpty: '该范围内没有完成记录', empty: '还没有待办',
-        stats: '统计', statsUndone: '未完成', statsTotal: '共 {count} 项',
+        stats: '统计', statsUndone: '未完成', statsTotal: '共 {count} 项', statsAllDone: '这个周期都完成了',
         staleHint: '超过 {n} 天未完成', loading: '加载中…', failed: '读取失败',
         actionFailed: '操作失败，请重试',
         retry: '重试', pickOne: '选一条看详情',
@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
         nav: 'To-do', title: 'To-do', new: 'New', search: 'Search',
         today: 'Today', overdue: 'Overdue', tomorrow: 'Tomorrow', week: 'This week', month: 'This month', later: 'Later', stale: 'Backlog',
         unplanned: 'Unscheduled', done: 'Completed', doneEmpty: 'No completions in this range', empty: 'No todos yet',
-        stats: 'Stats', statsUndone: 'Not done', statsTotal: '{count} total',
+        stats: 'Stats', statsUndone: 'Not done', statsTotal: '{count} total', statsAllDone: 'All done for this period',
         staleHint: 'Open for more than {n} days', loading: 'Loading…', failed: 'Failed to load',
         actionFailed: 'Action failed, please retry',
         retry: 'Retry', pickOne: 'Select an item',
@@ -520,6 +520,13 @@ window.__ModuleLoader__.load({
       statsSwatch: { width: 8, height: 8, borderRadius: 2, flex: 'none' },
       statsLabel: { color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       statsCount: { marginLeft: 'auto', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      // 每列：环形卡片 + 该周期的未完成清单。清单行直接复用 TodoRow，
+      // 所以勾选/选中的行为和矩阵完全一致。
+      statsCol: { display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 },
+      statsListCard: { display: 'flex', flexDirection: 'column', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-layer-1)', overflow: 'hidden', minWidth: 0 },
+      statsListHead: { display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '0.5px solid var(--dsw-alias-border-l2)', fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' },
+      statsListBody: { overflowY: 'auto', maxHeight: 380, padding: '6px 8px' },
+      statsEmpty: { padding: '28px 8px', textAlign: 'center', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' },
     }
 
     const PLUGIN_CSS = `
@@ -1500,8 +1507,8 @@ window.__ModuleLoader__.load({
      *
      * 环形图是手绘 SVG：用 stroke-dasharray 画进度弧，不引图表库，也不做弧线三角计算。
      */
-    function StatsCard({ t, titleKey, from, to, version }) {
-      const [stat, setStat] = useState({ loading: true, total: 0, done: 0 })
+    function StatsColumn({ t, titleKey, from, to, version, selectedId, onSelect, onToggle }) {
+      const [stat, setStat] = useState({ total: 0, done: 0, list: [] })
 
       useEffect(() => {
         let alive = true
@@ -1509,9 +1516,26 @@ window.__ModuleLoader__.load({
           .then((res) => {
             if (!alive) return
             const items = Array.isArray(res?.items) ? res.items : []
-            setStat({ loading: false, total: items.length, done: items.filter((i) => i.done === true).length })
+            // occurrences 给的是 todoId/date/repeat，而 TodoRow 要 id/dueDate/isRepeating。
+            // 这里做一次适配，好处是清单能**直接复用矩阵那一行**：外观、勾选语义、
+            // 循环任务按「这一次」打勾的行为，全都和别处一模一样，不会各写一套。
+            const list = items
+              .filter((i) => i.done !== true)
+              .map((i) => ({
+                id: i.todoId,
+                title: i.title,
+                done: false,
+                dueDate: i.date,
+                isRepeating: Boolean(i.repeat),
+                startTime: i.startTime,
+                endTime: i.endTime,
+                quadrant: i.quadrant,
+                abandoned: i.abandoned === true,
+              }))
+              .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+            setStat({ total: items.length, done: items.filter((i) => i.done === true).length, list })
           })
-          .catch(() => { if (alive) setStat({ loading: false, total: 0, done: 0 }) })
+          .catch(() => { if (alive) setStat({ total: 0, done: 0, list: [] }) })
         return () => { alive = false }
       }, [from, to, version])
 
@@ -1531,29 +1555,41 @@ window.__ModuleLoader__.load({
         h('span', { style: S.statsLabel }, label),
         h('span', { style: S.statsCount }, String(count)))
 
-      return h('div', { style: S.statsCard },
-        h('div', { style: S.statsHead },
-          h(Icon, { name: 'chart', size: 13 }),
-          h('span', null, t(titleKey)),
-          h('span', { style: S.statsTotal }, String(t('statsTotal')).replace('{count}', String(total)))),
-        h('div', { style: S.statsBody },
-          h('svg', { width: 84, height: 84, viewBox: '0 0 84 84', 'aria-hidden': 'true', style: { flex: 'none' } },
-            h('circle', { cx: 42, cy: 42, r: R, ...ring, stroke: undoneColor, opacity: total === 0 ? 0.28 : 1 }),
-            total > 0 && done > 0
-              ? h('circle', {
-                  cx: 42, cy: 42, r: R, ...ring,
-                  stroke: doneColor,
-                  strokeDasharray: `${(done / total) * C} ${C}`,
-                  transform: 'rotate(-90 42 42)',
-                })
-              : null,
-            h('text', {
-              x: 42, y: 42, textAnchor: 'middle', dominantBaseline: 'central',
-              fontSize: 16, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)',
-            }, `${pct}%`)),
-          h('div', { style: S.statsLegend },
-            legendRow(doneColor, t('done'), done),
-            legendRow(undoneColor, t('statsUndone'), undone))))
+      return h('div', { style: S.statsCol },
+        h('div', { style: S.statsCard },
+          h('div', { style: S.statsHead },
+            h(Icon, { name: 'chart', size: 13 }),
+            h('span', null, t(titleKey)),
+            h('span', { style: S.statsTotal }, String(t('statsTotal')).replace('{count}', String(total)))),
+          h('div', { style: S.statsBody },
+            h('svg', { width: 84, height: 84, viewBox: '0 0 84 84', 'aria-hidden': 'true', style: { flex: 'none' } },
+              h('circle', { cx: 42, cy: 42, r: R, ...ring, stroke: undoneColor, opacity: total === 0 ? 0.28 : 1 }),
+              total > 0 && done > 0
+                ? h('circle', {
+                    cx: 42, cy: 42, r: R, ...ring,
+                    stroke: doneColor,
+                    strokeDasharray: `${(done / total) * C} ${C}`,
+                    transform: 'rotate(-90 42 42)',
+                  })
+                : null,
+              h('text', {
+                x: 42, y: 42, textAnchor: 'middle', dominantBaseline: 'central',
+                fontSize: 16, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)',
+              }, `${pct}%`)),
+            h('div', { style: S.statsLegend },
+              legendRow(doneColor, t('done'), done),
+              legendRow(undoneColor, t('statsUndone'), undone)))),
+        h('div', { style: S.statsListCard },
+          h('div', { style: S.statsListHead },
+            h('span', null, `${t(titleKey)} · ${t('statsUndone')}`),
+            h('span', { style: S.statsTotal }, String(stat.list.length))),
+          h('div', { style: S.statsListBody },
+            stat.list.length === 0
+              ? h('div', { style: S.statsEmpty }, t('statsAllDone'))
+              : stat.list.map((item) => h(TodoRow, {
+                  key: `${item.id}-${item.dueDate}`,
+                  t, item, selectedId, onSelect, onToggle,
+                })))))
     }
 
     function CalendarView({ t, selectedDay, onPickDay, version }) {
@@ -3473,20 +3509,21 @@ window.__ModuleLoader__.load({
             version: dataVersion,
           })
         }
-        // 统计 = 独立一屏：本周 / 本月各一张环形卡片
+        // 统计 = 独立一屏：本周 / 本月各一列（环形图 + 未完成清单）
         if (activeRail === 'stats') {
           // 固定看「当前」这一周 / 这一月（标签写的就是本周/本月）。
           const statsToday = dateKeyOf(new Date())
           const statsAt = new Date()
           const weekFrom = mondayOfKey(statsToday)
+          const statsProps = { t, version: dataVersion, selectedId: selected, onSelect: handleSelect, onToggle: handleToggle }
           return h('div', { style: S.statsPane },
             h('div', { style: S.statsWrap },
-              h(StatsCard, {
-                t, titleKey: 'week', version: dataVersion,
+              h(StatsColumn, {
+                ...statsProps, titleKey: 'week',
                 from: weekFrom, to: shiftKeyLocal(weekFrom, 6),
               }),
-              h(StatsCard, {
-                t, titleKey: 'month', version: dataVersion,
+              h(StatsColumn, {
+                ...statsProps, titleKey: 'month',
                 from: `${statsToday.slice(0, 7)}-01`,
                 to: dateKeyOf(new Date(statsAt.getFullYear(), statsAt.getMonth() + 1, 0)),
               })))
