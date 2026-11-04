@@ -3,9 +3,9 @@
 DeepSeek Harness 的侧栏待办插件：管理日常工作的清单，数据和 agent 共用一份。
 
 > 仓库、npm 包与插件标识统一为 `dsh-quadrant-todolist`；DSH 侧栏显示的名字是「待办」。
-> 已发布：https://www.npmjs.com/package/dsh-quadrant-todolist
+> 尚未发布到 npm；仓库地址 https://github.com/ZIYE-JK/dsh-quadrant-todolist
 
-当前版本 **0.2.2**（v1 + v2 功能：编辑弹窗、循环任务、月视图日历、分类管理）。
+当前版本 **1.0.0**（四象限矩阵、周/月视图、统计、系统与飞书通知、法定工作日与艾宾浩斯重复）。
 
 ## 兼容性
 
@@ -33,7 +33,9 @@ DeepSeek Harness 的侧栏待办插件：管理日常工作的清单，数据和
 
 ## 安装
 
-**从 npm（推荐）**
+**从 npm**
+
+> ⚠️ 尚未发布到 npm。包名已定为 `dsh-quadrant-todolist`，发布前请走下面的 GitHub 方式。
 
 ```bash
 dsh plugin --profile web add dsh-quadrant-todolist
@@ -41,10 +43,10 @@ dsh plugin --profile web add dsh-quadrant-todolist
 
 装完在侧栏「自动化任务」下方出现「待办」。也可以在宿主的 **插件 → 发现** 里搜 `dsh-quadrant-todolist`（或「待办」），在市场里一键安装。
 
-**从 GitHub 源码**
+**从 GitHub 源码（当前推荐）**
 
 ```bash
-dsh plugin --profile web add github:Natte/dsh-quadrant-todolist
+dsh plugin --profile web add github:ZIYE-JK/dsh-quadrant-todolist
 ```
 
 适合想跟最新提交、或 npm 还没发到新版本时用；更新按 commit 追，没有版本号。
@@ -54,7 +56,7 @@ dsh plugin --profile web add github:Natte/dsh-quadrant-todolist
 把这个仓库目录直接装进 profile（链接方式，改代码即时生效）：
 
 ```text
-plugin_manager install_bundle  target: D:\dsh-quadrant-todolist
+plugin_manager install_bundle  target: <本仓库目录>
 ```
 
 装了之后改 `index.js` 需要把插件行关再开才会重新加载模块；只改 `client.js` 会被 HMR 自动拾取。
@@ -129,6 +131,6 @@ plugin_manager install_bundle  target: D:\dsh-quadrant-todolist
 ## 开发
 
 ```bash
-node --test          # 107 个测试
+node --test          # 143 个测试
 node --check client.js
 ```
