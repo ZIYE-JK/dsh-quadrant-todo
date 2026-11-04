@@ -372,6 +372,10 @@ window.__ModuleLoader__.load({
       detailHeader: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '20px 20px 12px' },
       detailIcon: { width: 24, height: 24, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
       detailTitleInput: { flex: 1, fontSize: 18, fontWeight: 600, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontFamily: 'inherit', outline: 'none', padding: 0, lineHeight: '28px' },
+      // 详情面板右上角的关闭按钮：跟 subtaskDeleteBtn / untilClear 同一套小图标按钮语言。
+      // 这里**不写** background，跟 noticeClose 一样把背景交给 .td-btn / .td-btn:hover，
+      // 于是静止态仍是透明、悬停才有一层淡淡的强调底色（写成 inline 的 transparent 会把 hover 压掉）。
+      detailClose: { flex: 'none', width: 28, height: 28, marginTop: 1, padding: 0, border: 'none', borderRadius: 6, color: 'var(--dsw-alias-label-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
       detailSection: { padding: '0 20px 12px' },
       subtaskList: { display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 },
       subtaskRow: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 30, padding: '0 4px', borderRadius: 4 },
@@ -446,7 +450,7 @@ window.__ModuleLoader__.load({
       warn: { margin: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, color: 'var(--dsw-alias-state-warn-primary)', background: 'color-mix(in srgb, var(--dsw-alias-state-warn-primary) 8%, transparent)', display: 'flex', alignItems: 'center', gap: 8 },
       addBtn: { height: 32, padding: '0 12px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, cursor: 'pointer', background: 'transparent' },
       detailTitle: { fontSize: 15, fontWeight: 600, color: 'var(--dsw-alias-label-primary)', marginBottom: 12 },
-      dot: { flex: 'none', width: 5, height: 5, borderRadius: 999, background: 'var(--dsw-alias-label-tertiary)' },
+
       // Quadrant picker
       quadrantPicker: { display: 'flex', flexDirection: 'column', gap: 4, padding: 6 },
       quadrantPickerItem: { display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 8px', border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' },
@@ -475,15 +479,38 @@ window.__ModuleLoader__.load({
       untilClear: { flex: 'none', width: 26, height: 26, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 14, lineHeight: '26px', textAlign: 'center', cursor: 'pointer' },
       untilField: { flex: 'none', width: 150 },
       // Calendar view (standalone)
-      calendarView: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '16px 20px', overflowY: 'auto' },
-      calendarViewHead: { display: 'flex', alignItems: 'center', gap: 6, height: 32, marginBottom: 12 },
+      // 月视图：滚动责任在单元格内部，所以这一层只负责「被父级压到固定高度」。
+      // minHeight: 0 是必须的 —— 否则 flex 子项默认 min-height: auto，
+      // 长内容会把整层顶高，内层 overflow 永远不触发，滚的反而是整页。
+      calendarView: { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '16px 20px', overflowY: 'auto' },
+      calendarViewHead: { display: 'flex', alignItems: 'center', gap: 6, height: 32, marginBottom: 12, flex: 'none' },
       calendarViewTitle: { flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600 },
-      calendarViewWeekdays: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 },
-      calendarViewGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, flex: 1 },
-      calendarViewCell: { display: 'flex', flexDirection: 'column', gap: 2, padding: 6, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l2)', minHeight: 80, cursor: 'pointer', overflow: 'hidden' },
-      calendarViewDay: { fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' },
-      calendarViewItem: { fontSize: 10.5, lineHeight: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--dsw-alias-label-secondary)' },
-      calendarViewMore: { fontSize: 10, color: 'var(--dsw-alias-label-tertiary)' },
+      calendarViewWeekdays: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4, flex: 'none' },
+      // monthGrid 恒为 42 格 = 6 行，所以行高用 gridAutoRows 就能一次定死：
+      // minmax(88px, 1fr) 的下限是常量而不是内容，某一格塞再多也不会把自己那一行撑开
+      // （旧写法是隐式 auto 行 + 单元格 minHeight: 80，长内容会顶高整行）。
+      // minHeight: 0 让这个 flex 子项能被压缩到内容高度以下，把溢出交给单元格自己处理。
+      calendarViewGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: 'minmax(88px, 1fr)', gap: 4, flex: 1, minHeight: 0 },
+      // 单元格自身也是 flex 子项：minHeight: 0（原来写死 80）才能按行高分配，
+      // 让下面的「日期行 + 可滚动列表」各就各位。
+      calendarViewCell: { display: 'flex', flexDirection: 'column', gap: 2, padding: 6, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l2)', minHeight: 0, cursor: 'pointer', overflow: 'hidden' },
+      calendarViewDay: { fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)', flex: 'none' },
+      // 条目区 = 单元格里唯一可伸缩的一格，也是唯一滚动的地方。
+      // flex: 1 + minHeight: 0 让它吃掉行高减去日期行之后的全部空间；
+      // 底部 10px 的 mask 渐隐只是「下面还有」的提示 —— 没溢出时那片区域本来就没有内容，
+      // 所以空单元格上完全看不出来，不需要 JS 判断是否溢出，也不会有滚动监听。
+      calendarViewItems: {
+        flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2,
+        overflowY: 'auto', overflowX: 'hidden',
+        maskImage: 'linear-gradient(to bottom, #000 calc(100% - 10px), transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 10px), transparent 100%)',
+      },
+      // 月视图条目 = 周视图全天胶囊（S.weekChip）的同款做法：一条一行、圆角、省略号，
+      // 象限色走「低透明度底色 + 左侧 3px 强调边」（accent 由调用处用 color-mix 注入），
+      // 高度锁在 17px，别挤到一格只放得下一两条。
+      calendarViewItem: { flex: 'none', boxSizing: 'border-box', height: 17, padding: '1px 4px', borderRadius: 4, borderLeft: '3px solid transparent', fontSize: 10.5, lineHeight: '15px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      // 完成态保留原来的删除线 + 三级色。
+      calendarViewItemDone: { textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' },
       // Week view（周视图：7 列 × 0-24 时段）
       weekView: { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 16px 16px', overflow: 'hidden' },
       weekNav: { display: 'flex', alignItems: 'center', gap: 6, height: 32, marginBottom: 8, flex: 'none' },
@@ -1752,18 +1779,26 @@ window.__ModuleLoader__.load({
               },
             },
             h('div', { style: key === todayKey ? { ...S.calendarViewDay, ...S.calendarCellToday } : S.calendarViewDay }, String(Number(key.slice(8, 10)))),
-            items.slice(0, 2).map((item) => h('div', {
-              key: `${item.todoId}-${item.date}`,
-              style: S.calendarViewItem,
-            },
-            h('span', { style: { ...S.dot, background: QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority) }, 'aria-hidden': 'true' }),
-            h('span', {
-              // 完成态与矩阵行一致：删除线 + 淡色，而不是让它看不出来。
-              style: item.done
-                ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' }
-                : { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-            }, asText(item.title)))),
-            items.length > 2 ? h('div', { style: S.calendarViewMore }, `+${items.length - 2}`) : null)
+            // 这里不再 slice(0, 2)、也不再有 +N：当天所有待办都渲染，
+            // 放不下的部分靠这一格自己的滚动看（滚轮悬停在格内即可），
+            // 因此单元格的高度能被用满，也不会靠「+3」把条目本身藏起来。
+            h('div', { style: S.calendarViewItems },
+              items.map((item) => {
+                const accent = QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority)
+                return h('div', {
+                  key: `${item.todoId}-${item.date}`,
+                  // 原生 title 兜一下：单元格很窄，省略号之外还能悬停看全名。
+                  title: asText(item.title),
+                  style: {
+                    ...S.calendarViewItem,
+                    // 与周视图全天带同源：26% 的象限底色 + 实色左边，
+                    // 这样在应用的半透明面板上也读得清。
+                    background: `color-mix(in srgb, ${accent} 26%, transparent)`,
+                    borderLeftColor: accent,
+                    ...(item.done ? S.calendarViewItemDone : null),
+                  },
+                }, asText(item.title))
+              })))
           })),
       )
     }
@@ -2857,7 +2892,7 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
     }
 
-    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove }) {
+    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove, onClose }) {
       const [title, setTitle] = useState(asText(item.title))
       const [note, setNote] = useState(asText(item.note))
       const [category, setCategory] = useState(asText(item.category))
@@ -3051,7 +3086,17 @@ window.__ModuleLoader__.load({
             placeholder: t('titlePlaceholder'),
             'aria-label': t('titlePlaceholder'),
             onChange: (e) => { setTitle(e.target.value); markDirty() },
-          })),
+          }),
+          // 关闭按钮：只收起右侧编辑面板（清空 selected），不动这条待办本身。
+          // 文案复用既有的 dismiss（关闭 / Dismiss）——「清除」说的是清空某个字段的值，语气不对。
+          h('button', {
+            type: 'button',
+            className: 'td-btn',
+            style: S.detailClose,
+            'aria-label': t('dismiss'),
+            title: t('dismiss'),
+            onClick: () => { if (typeof onClose === 'function') onClose() },
+          }, h(Icon, { name: 'x', size: 14 }))),
 
         // Subtasks
         h('div', { style: S.detailSection },
@@ -3607,7 +3652,10 @@ window.__ModuleLoader__.load({
         if (activeRail === 'view') {
           return h(CalendarView, {
             t,
-            selectedDay: null,
+            // 必须把当前筛选的那天传下去：左栏那枚「11-03 ×」胶囊删掉之后，
+            // **格子高亮是唯一能看出「筛的是哪天」的地方**。原来写死 null，
+            // 等于高亮从来没亮过，用户选完一天完全看不出筛了哪一天。
+            selectedDay: dayFilter,
             onPickDay: handleSelectDay,
             version: dataVersion,
           })
@@ -3705,6 +3753,8 @@ window.__ModuleLoader__.load({
                 onRemoveSubtask: handleRemoveSubtask,
                 onSave: handleSaveDetail,
                 onRemove: handleRemoveSelected,
+                // 关闭 = 只清空选中项；面板是靠 selectedItem 是否为 null 决定挂不挂载的。
+                onClose: () => setSelected(null),
               })
             : null),
         state.notices.includes('corrupt') && !noticeHidden
