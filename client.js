@@ -11,7 +11,7 @@ window.__ModuleLoader__.load({
         nav: '待办', title: '待办', new: '新建', search: '搜索待办',
         today: '今天', overdue: '逾期', tomorrow: '明天', week: '本周', month: '本月', later: '以后', stale: '积压',
         unplanned: '未排期', done: '已完成', doneEmpty: '该范围内没有完成记录', empty: '还没有待办',
-        statsUndone: '未完成', statsTotal: '共 {count} 项',
+        stats: '统计', statsUndone: '未完成', statsTotal: '共 {count} 项',
         staleHint: '超过 {n} 天未完成', loading: '加载中…', failed: '读取失败',
         actionFailed: '操作失败，请重试',
         retry: '重试', pickOne: '选一条看详情',
@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
         nav: 'To-do', title: 'To-do', new: 'New', search: 'Search',
         today: 'Today', overdue: 'Overdue', tomorrow: 'Tomorrow', week: 'This week', month: 'This month', later: 'Later', stale: 'Backlog',
         unplanned: 'Unscheduled', done: 'Completed', doneEmpty: 'No completions in this range', empty: 'No todos yet',
-        statsUndone: 'Not done', statsTotal: '{count} total',
+        stats: 'Stats', statsUndone: 'Not done', statsTotal: '{count} total',
         staleHint: 'Open for more than {n} days', loading: 'Loading…', failed: 'Failed to load',
         actionFailed: 'Action failed, please retry',
         retry: 'Retry', pickOne: 'Select an item',
@@ -508,8 +508,9 @@ window.__ModuleLoader__.load({
       weekResize: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 9, maxHeight: '40%', cursor: 'ns-resize', touchAction: 'none' },
       weekBlockDragging: { zIndex: 5, boxShadow: 'var(--dsw-elevation-panel)' },
       weekNowLine: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, pointerEvents: 'none', background: 'var(--dsw-alias-state-error-primary)' },
-      // 周视图下方的统计：两张卡并排，放在周网格的滚动区之外，不会被滚走。
-      statsWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px 16px' },
+      // 统计是左栏独立的一屏：两张卡并排，窄面板下自动换行。
+      statsPane: { flex: 1, minWidth: 0, minHeight: 0, overflowY: 'auto', paddingTop: 16 },
+      statsWrap: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, padding: '0 16px 16px' },
       statsCard: { display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-layer-1)', minWidth: 0 },
       statsHead: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' },
       statsTotal: { marginLeft: 'auto', fontSize: 11, fontWeight: 400, color: 'var(--dsw-alias-label-tertiary)' },
@@ -519,7 +520,6 @@ window.__ModuleLoader__.load({
       statsSwatch: { width: 8, height: 8, borderRadius: 2, flex: 'none' },
       statsLabel: { color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       statsCount: { marginLeft: 'auto', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
-      focusCol: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' },
     }
 
     const PLUGIN_CSS = `
@@ -2010,6 +2010,7 @@ window.__ModuleLoader__.load({
         { key: 'plan', labelKey: 'plan', icon: 'plan' },
         { key: 'view', labelKey: 'view', icon: 'calendar' },
         { key: 'focus', labelKey: 'focus', icon: 'week' },
+        { key: 'stats', labelKey: 'stats', icon: 'chart' },
       ]
       return h('div', { style: S.leftRail },
         items.map((item) => h('button', {
@@ -3463,20 +3464,22 @@ window.__ModuleLoader__.load({
             version: dataVersion,
           })
         }
-        // 专注 = 周视图（7 天 × 0-24 时段）+ 下方本周 / 本月统计
+        // 专注 = 周视图（7 天 × 0-24 时段）
         if (activeRail === 'focus') {
-          // 统计固定看「当前」这一周 / 这一月，不跟着周视图翻页走（标签写的就是本周/本月）。
+          return h(WeekView, {
+            t,
+            onSelect: handleSelect,
+            onReschedule: handleReschedule,
+            version: dataVersion,
+          })
+        }
+        // 统计 = 独立一屏：本周 / 本月各一张环形卡片
+        if (activeRail === 'stats') {
+          // 固定看「当前」这一周 / 这一月（标签写的就是本周/本月）。
           const statsToday = dateKeyOf(new Date())
-          const statsMonthKey = statsToday.slice(0, 7)
           const statsAt = new Date()
           const weekFrom = mondayOfKey(statsToday)
-          return h('div', { style: S.focusCol },
-            h(WeekView, {
-              t,
-              onSelect: handleSelect,
-              onReschedule: handleReschedule,
-              version: dataVersion,
-            }),
+          return h('div', { style: S.statsPane },
             h('div', { style: S.statsWrap },
               h(StatsCard, {
                 t, titleKey: 'week', version: dataVersion,
@@ -3484,7 +3487,7 @@ window.__ModuleLoader__.load({
               }),
               h(StatsCard, {
                 t, titleKey: 'month', version: dataVersion,
-                from: `${statsMonthKey}-01`,
+                from: `${statsToday.slice(0, 7)}-01`,
                 to: dateKeyOf(new Date(statsAt.getFullYear(), statsAt.getMonth() + 1, 0)),
               })))
         }
