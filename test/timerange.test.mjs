@@ -121,13 +121,59 @@ test('a recurring task expands every occurrence with its block', async () => {
   }
 })
 
-test('notifications fire at the block start, not the deadline', async () => {
+test('a 时间段 fires 到期 at its END, not its start', async () => {
+  // 这条曾经断言反了：拿开始时间当截止，会让 09:30–10:00 在 09:30 就报「到期」。
   const item = { id: 't1', title: '排期任务', dueDate: '2026-11-03', startTime: '08:00', endTime: '18:00', bucket: 'today' }
   const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
-  assert.equal(collectDue([item], at(7, 59), NOTIFY).length, 0)
-  const fired = collectDue([item], at(8, 0), NOTIFY)
-  assert.equal(fired.length, 1, 'fires at 08:00 (block start)')
+  assert.equal(collectDue([item], at(7, 59), NOTIFY).length, 0, 'nothing before the block')
+  assert.equal(collectDue([item], at(8, 0), NOTIFY).length, 0, 'starting the block is NOT 到期')
+  assert.equal(collectDue([item], at(12, 0), NOTIFY).length, 0, 'mid-block is NOT 到期')
+  assert.equal(collectDue([item], at(17, 59), NOTIFY).length, 0, 'one minute before the end is NOT 到期')
+  const fired = collectDue([item], at(18, 0), NOTIFY)
+  assert.equal(fired.length, 1, '到期 fires when the block ENDS')
   assert.equal(fired[0].kind, 'due')
+  assert.equal(fired[0].dueTime, '18:00', 'and reports the real deadline')
+})
+
+test('a 时间点 fires 到期 at that point (point IS the deadline)', async () => {
+  const item = { id: 't2', title: '交周报', dueDate: '2026-11-03', startTime: '09:30', endTime: null, bucket: 'today' }
+  const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
+  assert.equal(collectDue([item], at(9, 29), NOTIFY).length, 0)
+  const fired = collectDue([item], at(9, 30), NOTIFY)
+  assert.equal(fired.length, 1)
+  assert.equal(fired[0].dueTime, '09:30')
+})
+
+test('REGRESSION: a 09:30-10:00 block created at 09:33 must not fire immediately', async () => {
+  // 老板实际遇到的：建完 22 秒就弹「到期 · 截止 09:30」。
+  const item = {
+    id: 't3', title: '提供B2B数据图表-PPT用', dueDate: '2026-11-04',
+    startTime: '09:30', endTime: '10:00', bucket: 'today',
+    createdAt: '2026-11-04T01:33:13.449Z',   // = 09:33:13 本地
+  }
+  const at = (h, m) => new Date(2026, 10, 4, h, m, 0)
+  assert.equal(collectDue([item], at(9, 33), NOTIFY).length, 0, 'not 22 seconds after creation')
+  assert.equal(collectDue([item], at(9, 40), NOTIFY).length, 0)
+  assert.equal(collectDue([item], at(9, 59), NOTIFY).length, 0)
+  const fired = collectDue([item], at(10, 0), NOTIFY)
+  assert.equal(fired.length, 1, 'fires at the real deadline')
+  assert.equal(fired[0].dueTime, '10:00', 'reports 10:00, not the 09:30 start')
+})
+
+test('a same-day deadline already past at creation is not nagged on creation', async () => {
+  // 09:30 建一条今天、没填时间的待办：默认时限 09:00 早已过去，不该立刻弹。
+  const item = {
+    id: 't4', title: '无时间的今日待办', dueDate: '2026-11-04',
+    startTime: null, endTime: null, bucket: 'today',
+    createdAt: '2026-11-04T01:30:00.000Z',   // = 09:30 本地
+  }
+  const at = (h, m) => new Date(2026, 10, 4, h, m, 0)
+  assert.equal(collectDue([item], at(9, 31), NOTIFY).length, 0, 'no instant nag')
+  // 但跨天的过期不受影响：第二天照常进逾期
+  const nextDay = new Date(2026, 10, 5, 9, 30, 0)
+  const events = collectDue([item], nextDay, NOTIFY)
+  assert.equal(events.length, 1)
+  assert.equal(events[0].kind, 'overdue')
 })
 
 test('with no time at all it falls back to 09:00 that day', async () => {
