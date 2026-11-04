@@ -1567,7 +1567,12 @@ window.__ModuleLoader__.load({
               style: S.calendarViewItem,
             },
             h('span', { style: { ...S.dot, background: QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority) }, 'aria-hidden': 'true' }),
-            h('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, asText(item.title)))),
+            h('span', {
+              // 完成态与矩阵行一致：删除线 + 淡色，而不是让它看不出来。
+              style: item.done
+                ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' }
+                : { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+            }, asText(item.title)))),
             items.length > 2 ? h('div', { style: S.calendarViewMore }, `+${items.length - 2}`) : null)
           })),
       )
