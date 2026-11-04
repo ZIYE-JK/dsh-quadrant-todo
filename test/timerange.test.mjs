@@ -182,3 +182,21 @@ test('with no time at all it falls back to 09:00 that day', async () => {
   assert.equal(collectDue([item], at(8, 59), NOTIFY).length, 0)
   assert.equal(collectDue([item], at(9, 0), NOTIFY).length, 1)
 })
+
+test('a time point defaulting to "now" at creation does not self-notify', async () => {
+  // 新建时时间点默认就是此刻 → 时限正好等于创建时刻，不该在创建后几秒弹一次。
+  const base = {
+    id: 't5', title: '刚建的', dueDate: '2026-11-04',
+    startTime: '13:30', endTime: null, bucket: 'today',
+    createdAt: '2026-11-04T05:30:27.000Z',   // = 13:30:27 本地
+  }
+  const at = (h, m, s = 0) => new Date(2026, 10, 4, h, m, s)
+  assert.equal(collectDue([base], at(13, 30, 30), NOTIFY).length, 0, 'same minute as creation')
+  assert.equal(collectDue([base], at(13, 35), NOTIFY).length, 0)
+  // 但真正在未来的时限照常提醒
+  const later = { ...base, startTime: '14:00' }
+  assert.equal(collectDue([later], at(13, 59), NOTIFY).length, 0)
+  const fired = collectDue([later], at(14, 0), NOTIFY)
+  assert.equal(fired.length, 1)
+  assert.equal(fired[0].dueTime, '14:00')
+})

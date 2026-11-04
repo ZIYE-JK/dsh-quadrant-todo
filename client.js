@@ -3449,10 +3449,11 @@ window.__ModuleLoader__.load({
         }
       }, [reload, retrying])
 
-      // 点某天 = 只看那天的计划（再点一次取消）。选中的格子本身会高亮，
-      // 不再额外挂一枚「11-03 ×」胶囊——那是重复信息，用户明确说没必要。
+      // 点某天 = 只看那天的计划。**不做「再点一次取消」的开关**：那样第二次点同一天
+      // 会把筛选整个撤掉，别的日期的待办一起冒出来，看起来就像筛选坏了。
+      // 想回到全部，点左栏的「全部」——它会清掉日筛选。
       const handleSelectDay = (dayKey) => {
-        setDayFilter((prev) => (prev === dayKey ? null : dayKey))
+        setDayFilter(dayKey)
       }
 
       const items = state.items
@@ -3460,8 +3461,21 @@ window.__ModuleLoader__.load({
       // 通知开关直接反映宿主持久化的设置，不再单独存一份本地状态（否则两者会漂移）。
       const notificationOn = Boolean(settings && settings.notify && settings.notify.system)
 
+      /** 本地 HH:mm，用于新建时的默认时间点。 */
+      const clockTime = (at) => `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+
       const handleAddToQuadrant = (quadrant) => {
-        setDialog({ initial: { quadrant } })
+        // 在选中的那天上点「+」：默认日期就是那天，默认时间点就是此刻。
+        // 没选日（全部）时退回今天。
+        // 只影响**创建** —— 编辑走右侧详情面板，用的是已保存的值，不会被这里带跑。
+        const at = new Date()
+        setDialog({
+          initial: {
+            quadrant,
+            dueDate: dayFilter ?? dateKeyOf(at),
+            startTime: clockTime(at),
+          },
+        })
       }
 
       /** 未完成在前、已完成后在后。完成的行**不再被剔除**。 */
@@ -3644,7 +3658,9 @@ window.__ModuleLoader__.load({
         title: editing ? asText(initial.title) : '',
         note: editing ? asText(initial.note) : '',
         dueDate: editing ? asText(initial.dueDate) : (asText(initial?.dueDate) || dateKeyOf(new Date())),
-        startTime: editing ? asText(initial.startTime) : '',
+        // 新建时 startTime 由调用方给（点哪天就用哪天、时间点用此刻）；
+        // 编辑时就是这条待办已保存的值 —— 两者是同一个表达式，不会互相污染。
+        startTime: asText(initial?.startTime),
         endTime: editing ? asText(initial.endTime) : '',
         timeMode: editing && asText(initial.endTime) !== '' ? 'range' : 'point',
         priority: editing && ['high', 'medium', 'low'].includes(initial.priority) ? initial.priority : null,
