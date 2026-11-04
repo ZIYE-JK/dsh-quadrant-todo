@@ -81,6 +81,7 @@ window.__ModuleLoader__.load({
         settingsSaved: '设置已保存',
         quietStart: '开始', quietEnd: '结束',
         weekdays: '星期', monthDay: '每月几号', until: '结束日期',
+        repeatMonthDayHint: '29/30/31 在较短月份自动落到当月最后一天',
         confirm: '确认', add: '添加', delete: '删除',
         // --- 周视图 / 时间段 ---
         weekPrefix: '周', weekRange: '{from} – {to}',
@@ -178,6 +179,7 @@ window.__ModuleLoader__.load({
         settingsSaved: 'Settings saved',
         quietStart: 'Start', quietEnd: 'End',
         weekdays: 'Weekdays', monthDay: 'Day of month', until: 'Until',
+        repeatMonthDayHint: '29/30/31 fall on the last day in shorter months',
         confirm: 'Confirm', add: 'Add', delete: 'Delete',
         // --- Week view / time range ---
         weekPrefix: '', weekRange: '{from} – {to}',
@@ -2910,6 +2912,11 @@ window.__ModuleLoader__.load({
           : null,
 
         freq === 'workday' ? h('div', { style: S.hint }, t('repeatWorkdayHint')) : null,
+        // 让「选 31 号 = 每月最后一天」这条隐式约定显式化：不然用户不会知道
+        // 短月会回退，也就不会想到用它来排「每月最后一天」。
+        freq === 'monthly' || freq === 'yearly'
+          ? h('div', { style: S.hint }, t('repeatMonthDayHint'))
+          : null,
 
         h('div', { style: S.untilRow },
           h('button', {
@@ -4170,7 +4177,9 @@ window.__ModuleLoader__.load({
                 style: S.input,
                 value: String(form.monthDay),
                 onChange: (e) => setForm((prev) => ({ ...prev, monthDay: Number(e.target.value) })),
-              }, MONTH_DAYS.map((day) => h('option', { key: day, value: String(day) }, String(day)))))
+              }, MONTH_DAYS.map((day) => h('option', { key: day, value: String(day) }, String(day)))),
+              // 与重复弹窗同一句说明：选 31 就等于「每月最后一天」。
+              h('span', { style: S.hint }, t('repeatMonthDayHint')))
           : null,
 
         form.repeatFreq !== ''
