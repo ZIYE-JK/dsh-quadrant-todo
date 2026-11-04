@@ -697,11 +697,20 @@ window.__ModuleLoader__.load({
       return `${year} 年 ${month + 1} 月`
     }
 
+    /**
+     * "HH:mm" → { hour, minute }。
+     * 24:00 是 endTime 的**存储形式**（当天最后一刻）：这里放行第 24 小时，
+     * 让 minutesOfTime('24:00') === 1440，周视图的块才能画到当天结束而不是塌成默认 60 分钟。
+     * 开始时间不会是 24:00（宿主端 pickTime 不接受），所以放行它不会让开始时间越界。
+     */
     function splitTimeKey(value) {
       const text = asText(value)
       const match = /^(\d{2}):(\d{2})$/.exec(text)
       if (match === null) return null
-      if (Number(match[1]) > 23 || Number(match[2]) > 59) return null
+      const hour = Number(match[1])
+      const minute = Number(match[2])
+      if (hour === 24) return minute === 0 ? { hour: '24', minute: '00' } : null
+      if (hour > 23 || minute > 59) return null
       return { hour: match[1], minute: match[2] }
     }
 
@@ -764,7 +773,8 @@ window.__ModuleLoader__.load({
     }
 
     // --- 周视图拖拽/缩放：时间算术（纯函数，无 DOM） ---
-    // 一整天 = 1440 分钟；1440 只在写回时出现（"24:00"），read 端 splitTimeKey 仍然只认 00:00–23:59。
+    // 一整天 = 1440 分钟。24:00（当天结束）读写两端都算 1440：splitTimeKey 读得回来，
+    // timeOfMinutes 也写得回去（1440 → "24:00"），所以时段能贴到当天最后一刻。
     const DAY_MIN = 24 * 60
 
     function timeOfMinutes(total) {
@@ -793,8 +803,8 @@ window.__ModuleLoader__.load({
     function rescheduleTimes(item, mode, deltaMinutes) {
       const baseStart = minutesOfTime(item.startTime)
       if (baseStart === null) return null
-      // 「有没有结束时间」只看字段本身。endTime 是 "24:00" 时 minutesOfTime 读不回来
-      // （splitTimeKey 只认 00:00–23:59），那种情况要按默认时长算，但绝不能把 endTime 丢掉。
+      // 「有没有结束时间」只看字段本身。endTime 是 "24:00" 时 minutesOfTime 读回 1440，
+      // 时长就是「到当天结束」；它必须原样保留，绝不能在这一步被丢掉。
       const hasEnd = asText(item.endTime) !== ''
       const rawEnd = minutesOfTime(item.endTime)
       const duration = rawEnd !== null && rawEnd > baseStart ? rawEnd - baseStart : POINT_BLOCK_MIN
@@ -915,12 +925,21 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 存储里的 24:00 = 当天最后一刻；给人看的一律写 00:00。
+     * 于是「23:00 到当天结束」读出来就是 23:00–00:00 —— 存储形式不变，只是展示层换一种写法。
+     */
+    function displayTime(value) {
+      const text = asText(value)
+      return text === '24:00' ? '00:00' : text
+    }
+
+    /**
      * 「时间」只有一个事实源：时间点 = startTime，时间段 = startTime + endTime。
      * 行徽标与详情面板都走这里，避免两处各显示一个时间（历史 bug）。
      */
     function timeRangeLabel(start, end) {
-      const from = asText(start)
-      const to = asText(end)
+      const from = displayTime(start)
+      const to = displayTime(end)
       if (from === '' && to === '') return ''
       if (from === '') return to
       if (to === '') return from
@@ -930,6 +949,51 @@ window.__ModuleLoader__.load({
     function timeLabel(item) {
       if (item === null || item === undefined) return ''
       return timeRangeLabel(item.startTime, item.endTime)
+    }
+
+    // --- 「时间」选择器的默认值 ---
+    // 新建的待办默认「全天」（没有 startTime / endTime）。只有用户主动去加时间时，
+    // 才按下面的规则补默认值，而且**只补空字段**，绝不覆盖已有值。
+    // 这些函数必须是纯函数 + 只在事件里调用：放在 render 里就会把「全天」又变回「有时刻」。
+
+    /** 整点文本：8 → "08:00"，24 → "24:00"（存储形式，展示时由 displayTime 转回 00:00）。 */
+    function hourText(hour) {
+      return `${String(hour).padStart(2, '0')}:00`
+    }
+
+    /** 本地 HH:mm —— 「时间点」的默认值 = 此刻（13:46 → "13:46"）。 */
+    function clockTimeOf(at = new Date()) {
+      return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+    }
+
+    /**
+     * 「时间段」的默认值：开始 = 下一个整点，结束 = 再下一个整点。
+     * 13:46 → 14:00 / 15:00；13:00 整点 → 14:00 / 15:00（已在整点也往前进一格）。
+     * 23 点之后没有「下下个整点」了，退到当天的最后一个小时：23:00 → 24:00（显示 00:00）。
+     */
+    function defaultTimeRange(at = new Date()) {
+      const startHour = at.getHours() + 1
+      if (startHour >= 24) return { startTime: '23:00', endTime: '24:00' }
+      return { startTime: hourText(startHour), endTime: hourText(startHour + 1) }
+    }
+
+    /** 某个开始时间之后一小时，夹在当天结束（24:00）以内；返回存储形式，开始时间非法时返回 null。 */
+    function oneHourAfter(start) {
+      const startMin = minutesOfTime(start)
+      if (startMin === null) return null
+      return timeOfMinutes(Math.min(DAY_MIN, startMin + 60))
+    }
+
+    /**
+     * 时间段编辑器在「显示形式」和「存储形式」之间换写：
+     * - 载入：24:00 → 00:00（小时列只有 00–23，显示一个选不到的 24 会让人以为坏了）
+     * - 写回：结束选中 00:00 且开始不是 00:00 时，理解为「到当天结束」→ 24:00
+     */
+    function storedEndOf(end, start) {
+      const endText = asText(end)
+      if (endText !== '00:00') return endText
+      const startText = asText(start)
+      return startText === '' || startText === '00:00' ? endText : '24:00'
     }
 
     /** 「什么时候到期」：时间段看结束，时间点看开始；都没有就是 null。 */
@@ -955,7 +1019,7 @@ window.__ModuleLoader__.load({
     function deadlineTitle(item, t) {
       const deadline = deadlineOf(item)
       if (deadline === null) return undefined
-      return String(t('deadlineAt')).replace('{time}', deadline)
+      return String(t('deadlineAt')).replace('{time}', displayTime(deadline))
     }
 
     // --- v4 常量：完成期限预设 / 超期处理 / 重复频率 ---
@@ -1400,7 +1464,15 @@ window.__ModuleLoader__.load({
         : null)
     }
 
-    function TimeField({ t, value, onChange }) {
+    /**
+     * 滚动式时间选择器。
+     *
+     * `onPrefill(text)` 是「用户第一次打开这个选择器」的补默认值机会：调用方在这里
+     * 只补空字段，并**返回补完后的显示值**（没有补就返回 null）。返回它是必要的——
+     * 补完的值此刻还没进 state，用它定位小时列才能让高亮和实际值一致。
+     * 补默认值只发生在这一个入口，不在每次 render / 每次敲键时发生。
+     */
+    function TimeField({ t, value, onChange, onPrefill }) {
       const picker = usePickerPopover()
       const popover = useAnchoredPopover(picker.open, TIME_POP.width, TIME_POP.height, picker.closePopover)
       const [draftHour, setDraftHour] = useState(null)
@@ -1426,7 +1498,9 @@ window.__ModuleLoader__.load({
 
       const open = () => {
         if (picker.open) { picker.closePopover(); return }
-        const parts = splitTimeKey(text)
+        const filled = typeof onPrefill === 'function' ? onPrefill(text) : null
+        const shown = typeof filled === 'string' && filled !== '' ? filled : text
+        const parts = splitTimeKey(shown)
         setDraftHour(parts === null ? null : parts.hour)
         picker.openPopover()
       }
@@ -1459,7 +1533,7 @@ window.__ModuleLoader__.load({
         'aria-label': t('pickTime'),
         onClick: open,
       },
-      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, text === '' ? t('pickTime') : text),
+      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, text === '' ? t('pickTime') : displayTime(text)),
       h('span', { style: S.pickerIcon, 'aria-hidden': 'true' }, h(Icon, { name: 'chevronDown', size: 12 }))),
 
       picker.open
@@ -2802,8 +2876,29 @@ window.__ModuleLoader__.load({
       const [showRepeatDialog, setShowRepeatDialog] = useState(false)
       const [showTimePicker, setShowTimePicker] = useState(false)
       const [showDueDialog, setShowDueDialog] = useState(false)
+      // 时间默认值：只在用户**主动去加时间**时补，而且只补空字段。
+      // 时间点 = 此刻；时间段 = 下一个整点 → 再下一个整点（23 点之后是 23:00 → 00:00，存 24:00）。
+      // 新建的待办本身不带时间（全天），所以这里绝不能挂载即填 —— 那等于把「全天」又变回「有时刻」。
+      const fillTime = (mode) => {
+        const base = defaultTimeRange()
+        const nextStart = startTime !== ''
+          ? startTime
+          : (mode === 'point' ? clockTimeOf() : base.startTime)
+        const nextEnd = mode !== 'range'
+          ? ''
+          : (endTime !== ''
+              ? endTime
+              : displayTime(startTime === '' ? base.endTime : oneHourAfter(nextStart)))
+        setStartTime(nextStart)
+        setEndTime(nextEnd)
+        // 只有真的补了值才算改过：重复展开一个已有时间的编辑器不该无端把面板标脏。
+        if (nextStart !== startTime || nextEnd !== endTime) markDirty()
+        return { startTime: nextStart, endTime: nextEnd }
+      }
       // 同一时刻只开一个属性选择器 / 弹窗，避免弹层互相叠着。
       const openPicker = (which) => {
+        // 第一次展开「时间」时按当前模式补默认值（补完用户还能改），收起时不动。
+        if (which === 'time' && !showTimePicker) fillTime(timeMode)
         setShowCategoryPicker(which === 'category' ? !showCategoryPicker : false)
         setShowQuadrantPicker(which === 'quadrant' ? !showQuadrantPicker : false)
         setShowTimePicker(which === 'time' ? !showTimePicker : false)
@@ -2842,7 +2937,8 @@ window.__ModuleLoader__.load({
           setDuePreset(asText(item.dueDate) === '' ? null : normalizeDuePreset(item.duePreset, item.dueDate))
           setOnOverdue(OVERDUE_MODES.includes(item.onOverdue) ? item.onOverdue : 'none')
           setStartTime(asText(item.startTime))
-          setEndTime(asText(item.endTime))
+          // 编辑器里显示 00:00，存的是 24:00 —— 载入时先转成显示形式。
+          setEndTime(displayTime(item.endTime))
           setTimeMode(asText(item.endTime) === '' ? 'point' : 'range')
           setRepeat(item.repeat ?? null)
         }
@@ -2875,9 +2971,12 @@ window.__ModuleLoader__.load({
         setSaving(true)
         setSavedMsg(null)
         try {
+          // 段里的「结束」是显示形式（00:00），写库要换成存储形式（24:00）。
+          // 校验和提交必须用同一个值，否则 23:00–00:00 会在客户端被误判成倒序。
+          const storedEnd = timeMode === 'range' ? storedEndOf(endTime, startTime) : ''
           // 宿主会拒绝「结束不晚于开始」的时间段；先在这里拦一下，
           // 否则用户只会看到笼统的「保存失败」，不知道错在哪。
-          if (startTime !== '' && endTime !== '' && endTime <= startTime) {
+          if (startTime !== '' && storedEnd !== '' && storedEnd <= startTime) {
             setSavedMsg({ ok: false, msg: t('timeRangeInvalid') })
             setTimeout(() => setSavedMsg(null), 3000)
             return
@@ -2892,7 +2991,7 @@ window.__ModuleLoader__.load({
             duePreset: dueDate === '' ? null : normalizeDuePreset(duePreset, dueDate),
             onOverdue,
             startTime: startTime === '' ? null : startTime,
-            endTime: timeMode === 'range' && endTime !== '' ? endTime : null,
+            endTime: storedEnd === '' ? null : storedEnd,
             repeat: repeat || null,
           }
           const ok = await onSave(payload)
@@ -2937,7 +3036,9 @@ window.__ModuleLoader__.load({
         return label === '' ? t('dueNone') : label
       }
 
-      const timeInvalid = startTime !== '' && timeMode === 'range' && endTime !== '' && endTime <= startTime
+      // 校验用存储形式（00:00 在开始不是 00:00 时等于 24:00），否则 23:00–00:00 会被当成倒序。
+      const timeInvalid = startTime !== '' && timeMode === 'range' && endTime !== ''
+        && storedEndOf(endTime, startTime) <= startTime
 
       return h('div', { style: S.detailPanel },
         // Header
@@ -3066,19 +3167,23 @@ window.__ModuleLoader__.load({
                     'aria-pressed': timeMode === 'point' ? 'true' : 'false',
                     style: { ...S.segItem, ...(timeMode === 'point' ? S.segItemOn : null) },
                     // 切到时间点：开始 = 时限 = 这个时刻，endTime 必须一起清掉。
-                    onClick: () => { setTimeMode('point'); setEndTime(''); markDirty() },
+                    // 空字段按「此刻」补上（用户主动来加时间了），已有值不动。
+                    onClick: () => { setTimeMode('point'); fillTime('point') },
                   }, t('timePoint')),
                   h('button', {
                     type: 'button', className: 'td-btn',
                     'aria-pressed': timeMode === 'range' ? 'true' : 'false',
                     style: { ...S.segItem, ...(timeMode === 'range' ? S.segItemOn : null) },
-                    onClick: () => setTimeMode('range'),
+                    // 切到时间段：空字段按「下一个整点 → 再下一个整点」补上。
+                    onClick: () => { setTimeMode('range'); fillTime('range') },
                   }, t('timeRange'))),
                 h('div', { style: { marginTop: 8 } },
                   timeMode === 'point'
                     ? h(TimeField, {
                         t,
                         value: startTime,
+                        // 打开选择器时若还是空的，补「此刻」。
+                        onPrefill: () => (startTime === '' ? fillTime('point').startTime : null),
                         onChange: (next) => { setStartTime(next); setEndTime(''); markDirty() },
                       })
                     : h('div', null,
@@ -3088,6 +3193,7 @@ window.__ModuleLoader__.load({
                             h(TimeField, {
                               t,
                               value: startTime,
+                              onPrefill: () => (startTime === '' ? fillTime('range').startTime : null),
                               onChange: (next) => { setStartTime(next); markDirty() },
                             })),
                           h('div', { style: { ...S.field, flex: '1 1 0' } },
@@ -3095,6 +3201,8 @@ window.__ModuleLoader__.load({
                             h(TimeField, {
                               t,
                               value: endTime,
+                              // 结束还空着就补：开始已有则 = 开始 + 1 小时，否则用默认时段。
+                              onPrefill: () => (endTime === '' ? fillTime('range').endTime : null),
                               onChange: (next) => { setEndTime(next); markDirty() },
                             }))),
                         h('button', {
@@ -3454,19 +3562,16 @@ window.__ModuleLoader__.load({
       // 通知开关直接反映宿主持久化的设置，不再单独存一份本地状态（否则两者会漂移）。
       const notificationOn = Boolean(settings && settings.notify && settings.notify.system)
 
-      /** 本地 HH:mm，用于新建时的默认时间点。 */
-      const clockTime = (at) => `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
-
       const handleAddToQuadrant = (quadrant) => {
-        // 在选中的那天上点「+」：默认日期就是那天，默认时间点就是此刻。
-        // 没选日（全部）时退回今天。
+        // 在选中的那天上点「+」：默认日期就是那天，没选日（全部）时退回今天。
+        // **不带 startTime / endTime** —— 新建的待办默认「全天」，时间由用户自己去加
+        // （展开「时间」属性行、或切到时间段时才会补默认值）。
         // 只影响**创建** —— 编辑走右侧详情面板，用的是已保存的值，不会被这里带跑。
         const at = new Date()
         setDialog({
           initial: {
             quadrant,
             dueDate: dayFilter ?? dateKeyOf(at),
-            startTime: clockTime(at),
           },
         })
       }
@@ -3649,10 +3754,11 @@ window.__ModuleLoader__.load({
         title: editing ? asText(initial.title) : '',
         note: editing ? asText(initial.note) : '',
         dueDate: editing ? asText(initial.dueDate) : (asText(initial?.dueDate) || dateKeyOf(new Date())),
-        // 新建时 startTime 由调用方给（点哪天就用哪天、时间点用此刻）；
+        // 新建时不带时间（默认「全天」，不填任何时间字段）；
         // 编辑时就是这条待办已保存的值 —— 两者是同一个表达式，不会互相污染。
         startTime: asText(initial?.startTime),
-        endTime: editing ? asText(initial.endTime) : '',
+        // 编辑器里显示 00:00，存的是 24:00。
+        endTime: editing ? displayTime(initial.endTime) : '',
         timeMode: editing && asText(initial.endTime) !== '' ? 'range' : 'point',
         priority: editing && ['high', 'medium', 'low'].includes(initial.priority) ? initial.priority : null,
         category: editing ? asText(initial.category) : '',
@@ -3666,6 +3772,23 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState(null)
       const [saving, setSaving] = useState(false)
       const [categoryRows, setCategoryRows] = useState([])
+
+      // 时间默认值：只在用户**主动去加时间**时补，而且只补空字段。
+      // 时间点 = 此刻；时间段 = 下一个整点 → 再下一个整点（23 点之后是 23:00 → 00:00，存 24:00）。
+      // 弹窗是打开就“全天”的，绝不能一挂载就补 —— 那会把每条新待办都变成「有时刻」。
+      const fillTime = (mode) => {
+        const base = defaultTimeRange()
+        const startTime = form.startTime !== ''
+          ? form.startTime
+          : (mode === 'point' ? clockTimeOf() : base.startTime)
+        const endTime = mode !== 'range'
+          ? ''
+          : (form.endTime !== ''
+              ? form.endTime
+              : displayTime(form.startTime === '' ? base.endTime : oneHourAfter(startTime)))
+        setForm((prev) => ({ ...prev, startTime, endTime }))
+        return { startTime, endTime }
+      }
 
       const alive = useRef(true)
       const seq = useRef(0)
@@ -3735,7 +3858,10 @@ window.__ModuleLoader__.load({
           setError(t('weekdaysRequired'))
           return
         }
-        if (form.startTime !== '' && form.timeMode === 'range' && form.endTime !== '' && form.endTime <= form.startTime) {
+        // 段里的「结束」是显示形式（00:00），写库要换成存储形式（24:00）。
+        // 校验和提交用同一个值，否则 23:00–00:00 会被客户端自己判成倒序。
+        const storedEnd = form.timeMode === 'range' ? storedEndOf(form.endTime, form.startTime) : ''
+        if (form.startTime !== '' && storedEnd !== '' && storedEnd <= form.startTime) {
           setError(t('timeRangeInvalid'))
           return
         }
@@ -3746,7 +3872,7 @@ window.__ModuleLoader__.load({
           dueDate: form.dueDate || null,
           // dueTime 是已废弃的别名：只写 startTime / endTime。
           startTime: form.startTime || null,
-          endTime: form.timeMode === 'range' && form.endTime !== '' ? form.endTime : null,
+          endTime: storedEnd === '' ? null : storedEnd,
           priority: form.priority || null,
           category: category === '' ? null : category,
           quadrant: form.quadrant || null,
@@ -3832,20 +3958,24 @@ window.__ModuleLoader__.load({
               className: 'td-btn',
               'aria-pressed': form.timeMode === 'point' ? 'true' : 'false',
               style: { ...S.segItem, ...(form.timeMode === 'point' ? S.segItemOn : null) },
-              onClick: () => setForm((prev) => ({ ...prev, timeMode: 'point', endTime: '' })),
+              // 切到时间点：开始 = 时限 = 这个时刻，endTime 一起清掉；空字段按「此刻」补。
+              onClick: () => { setForm((prev) => ({ ...prev, timeMode: 'point' })); fillTime('point') },
             }, t('timePoint')),
             h('button', {
               type: 'button',
               className: 'td-btn',
               'aria-pressed': form.timeMode === 'range' ? 'true' : 'false',
               style: { ...S.segItem, ...(form.timeMode === 'range' ? S.segItemOn : null) },
-              onClick: () => setForm((prev) => ({ ...prev, timeMode: 'range' })),
+              // 切到时间段：空字段按「下一个整点 → 再下一个整点」补上。
+              onClick: () => { setForm((prev) => ({ ...prev, timeMode: 'range' })); fillTime('range') },
             }, t('timeRange'))),
           h('div', { style: { marginTop: 8 } },
             form.timeMode === 'point'
               ? h(TimeField, {
                   t,
                   value: form.startTime,
+                  // 打开选择器时若还是空的，补「此刻」。
+                  onPrefill: () => (form.startTime === '' ? fillTime('point').startTime : null),
                   onChange: (next) => setForm((prev) => ({ ...prev, startTime: next, endTime: '' })),
                 })
               : h('div', null,
@@ -3855,6 +3985,7 @@ window.__ModuleLoader__.load({
                       h(TimeField, {
                         t,
                         value: form.startTime,
+                        onPrefill: () => (form.startTime === '' ? fillTime('range').startTime : null),
                         onChange: (next) => setForm((prev) => ({ ...prev, startTime: next })),
                       })),
                     h('div', { style: { ...S.field, flex: '1 1 0', marginBottom: 0 } },
@@ -3862,6 +3993,8 @@ window.__ModuleLoader__.load({
                       h(TimeField, {
                         t,
                         value: form.endTime,
+                        // 结束还空着就补：开始已有则 = 开始 + 1 小时，否则用默认时段。
+                        onPrefill: () => (form.endTime === '' ? fillTime('range').endTime : null),
                         onChange: (next) => setForm((prev) => ({ ...prev, endTime: next })),
                       }))),
                   h('button', {

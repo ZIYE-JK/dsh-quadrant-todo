@@ -200,3 +200,88 @@ test('a time point defaulting to "now" at creation does not self-notify', async 
   assert.equal(fired.length, 1)
   assert.equal(fired[0].dueTime, '14:00')
 })
+
+// --- 当天结束：24:00 只能当结束时间（23:32 之后新建时间段的默认值就是 23:00 → 24:00） ---
+
+test('24:00 is accepted as an end (the last instant of the day)', async () => {
+  const { store } = await fresh()
+  const t = await store.create({ title: '收尾', dueDate: '2026-11-03', startTime: '23:00', endTime: '24:00' })
+  assert.equal(t.startTime, '23:00')
+  assert.equal(t.endTime, '24:00')
+  const { items } = await store.occurrences({ from: '2026-11-01', to: '2026-11-30' })
+  assert.equal(items.find((i) => i.title === '收尾').endTime, '24:00', 'the week view must get the real end')
+})
+
+test('24:00 is rejected as a start (a day cannot start at its own end)', async () => {
+  const { store } = await fresh()
+  await assert.rejects(() => store.create({ title: 'x', startTime: '24:00' }), /截止时间格式应为 HH:mm/)
+  await assert.rejects(
+    () => store.create({ title: 'x', startTime: '24:00', endTime: '24:00' }),
+    /截止时间格式应为 HH:mm/,
+    'the start is validated first and stays strictly 00:00-23:59',
+  )
+})
+
+test('23:00 -> 00:00 is rejected while 23:00 -> 24:00 is the storable form of the same block', async () => {
+  const { store } = await fresh()
+  await assert.rejects(
+    () => store.create({ title: 'x', startTime: '23:00', endTime: '00:00' }),
+    /结束时间必须晚于开始时间/,
+  )
+  const ok = await store.create({ title: 'y', dueDate: '2026-11-03', startTime: '23:00', endTime: '24:00' })
+  assert.equal(ok.endTime, '24:00')
+})
+
+test('the range check compares minutes, not strings (23:30 -> 24:00 is 30 minutes)', async () => {
+  const { store, api } = await fresh()
+  const t = await store.create({ title: 'x', startTime: '23:30', endTime: '24:00' })
+  assert.equal(t.endTime, '24:00', '23:30 -> 24:00 must be accepted')
+  // 24:00 之后没有更晚的结束时间：00:30 在字符串上「更小」，在分钟上也不是「更晚」
+  await assert.rejects(() => api.update({ id: t.id, patch: { endTime: '00:30' } }), /结束时间必须晚于开始时间/)
+  assert.equal((await store.list({})).items.find((i) => i.id === t.id).endTime, '24:00', 'failed patch leaves state alone')
+  // 长时段同样只在分钟比较下成立
+  const long = await store.create({ title: 'y', startTime: '12:00', endTime: '24:00' })
+  assert.equal(long.endTime, '24:00')
+})
+
+test('24:01 / 25:00 are still rejected as an end', async () => {
+  const { store } = await fresh()
+  await assert.rejects(() => store.create({ title: 'x', startTime: '23:00', endTime: '24:01' }), /截止时间格式应为 HH:mm/)
+  await assert.rejects(() => store.create({ title: 'x', startTime: '23:00', endTime: '25:00' }), /截止时间格式应为 HH:mm/)
+})
+
+test('update can set an end of 24:00 and still rejects 24:00 as a start', async () => {
+  const { store, api } = await fresh()
+  const t = await store.create({ title: 'x', dueDate: '2026-11-03', startTime: '22:00' })
+  const grown = await api.update({ id: t.id, patch: { endTime: '24:00' } })
+  assert.equal(grown.startTime, '22:00')
+  assert.equal(grown.endTime, '24:00')
+  await assert.rejects(() => api.update({ id: t.id, patch: { startTime: '24:00' } }), /截止时间格式应为 HH:mm/)
+})
+
+test('REGRESSION: 24:00 survives a reload', async () => {
+  // migrate() 每次 load 都会跑；它原先用只认 00:00–23:59 的正则把 endTime 清成 null，
+  // 于是「23:00–00:00」落盘后再打开就只剩开始时间了。
+  const { store, file } = await fresh()
+  await store.create({ title: '深夜收尾', dueDate: '2026-11-04', startTime: '23:00', endTime: '24:00' })
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).todos[0].endTime, '24:00', 'written as 24:00')
+
+  const reopened = createStore({ file })
+  await reopened.load()
+  const row = (await reopened.list({})).items[0]
+  assert.equal(row.startTime, '23:00')
+  assert.equal(row.endTime, '24:00', 'still there after reload')
+})
+
+test('a block ending at 24:00 reports 到期 at midnight, not 逾期', async () => {
+  // 时限落在次日 0 点。若拿 dueDate 判「是不是过了那天」，跨过午夜的第一 tick
+  // 会直接进逾期分支，用户看到的是「逾期」而不是「到期」。
+  const item = { id: 'x', title: '深夜', dueDate: '2026-11-04', startTime: '23:00', endTime: '24:00', bucket: 'today' }
+  const at = (d, h, m) => new Date(2026, 10, d, h, m, 0)
+  assert.equal(collectDue([item], at(4, 23, 30), NOTIFY).length, 0, 'nothing before the end')
+  const fired = collectDue([item], at(5, 0, 0), NOTIFY)
+  assert.equal(fired.length, 1)
+  assert.equal(fired[0].kind, 'due', 'not overdue')
+  assert.equal(fired[0].dueTime, '24:00')
+  assert.equal(collectDue([item], at(6, 9, 0), NOTIFY)[0].kind, 'overdue', 'overdue the day after')
+})
