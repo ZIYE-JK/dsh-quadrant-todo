@@ -1,6 +1,13 @@
 MIT License
 
 Copyright (c) 2026 Natte
+Copyright (c) 2026 ZIYE-JK
+
+This project began as dsh-sidebar-todo (MIT, Copyright (c) 2026 Natte) and has since
+been substantially rewritten: the interface, interaction model, calendar and statistics
+views, notification pipeline, workday/Ebbinghaus recurrence and test suite are new
+work. The original copyright notice above is retained as the MIT License requires for
+the portions still derived from it; the second notice covers the new work.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
