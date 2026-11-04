@@ -509,6 +509,11 @@ window.__ModuleLoader__.load({
       // 象限色走「低透明度底色 + 左侧 3px 强调边」（accent 由调用处用 color-mix 注入），
       // 高度锁在 17px，别挤到一格只放得下一两条。
       calendarViewItem: { flex: 'none', boxSizing: 'border-box', height: 17, padding: '1px 4px', borderRadius: 4, borderLeft: '3px solid transparent', fontSize: 10.5, lineHeight: '15px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      // 胶囊是个真 <button>（点了要打开右侧编辑面板），所以要把浏览器默认外观清掉，
+      // 并补上 button 不会自己继承的字体与左对齐。宽度撑满，便于点。
+      calendarViewItemBtn: { width: '100%', textAlign: 'left', font: 'inherit', fontSize: 10.5, border: 'none', borderLeft: '3px solid transparent', background: 'transparent', cursor: 'pointer', display: 'block' },
+      // 正在编辑的那条：给个描边，和右侧面板对得上。
+      calendarViewItemSelected: { boxShadow: '0 0 0 1.5px var(--dsw-alias-state-business-primary)' },
       // 完成态保留原来的删除线 + 三级色。
       calendarViewItemDone: { textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' },
       // Week view（周视图：7 列 × 0-24 时段）
@@ -1722,7 +1727,7 @@ window.__ModuleLoader__.load({
                 })))))
     }
 
-    function CalendarView({ t, selectedDay, onPickDay, version }) {
+    function CalendarView({ t, selectedDay, onPickDay, version, onSelect, selectedId }) {
       const [cursor, setCursor] = useState(() => {
         const at = new Date()
         return { year: at.getFullYear(), month: at.getMonth() }
@@ -1817,17 +1822,30 @@ window.__ModuleLoader__.load({
             h('div', { style: S.calendarViewItems },
               items.map((item) => {
                 const accent = QUADRANT_COLORS[item.quadrant] ?? priorityColor(item.priority)
-                return h('div', {
+                const picked = item.todoId === selectedId
+                return h('button', {
                   key: `${item.todoId}-${item.date}`,
+                  type: 'button',
+                  className: 'td-btn',
                   // 原生 title 兜一下：单元格很窄，省略号之外还能悬停看全名。
                   title: asText(item.title),
+                  'aria-label': asText(item.title),
+                  // 点胶囊 = 打开右侧编辑面板。**必须挡住冒泡**，
+                  // 否则外层单元格会同时把它当成「选中这一天」。
+                  onClick: (event) => {
+                    event.stopPropagation?.()
+                    event.preventDefault?.()
+                    onSelect?.(item.todoId)
+                  },
                   style: {
                     ...S.calendarViewItem,
+                    ...S.calendarViewItemBtn,
                     // 与周视图全天带同源：26% 的象限底色 + 实色左边，
                     // 这样在应用的半透明面板上也读得清。
                     background: `color-mix(in srgb, ${accent} 26%, transparent)`,
                     borderLeftColor: accent,
                     ...(item.done ? S.calendarViewItemDone : null),
+                    ...(picked ? S.calendarViewItemSelected : null),
                   },
                 }, asText(item.title))
               })))
@@ -3692,6 +3710,9 @@ window.__ModuleLoader__.load({
             // 等于高亮从来没亮过，用户选完一天完全看不出筛了哪一天。
             selectedDay: dayFilter,
             onPickDay: handleSelectDay,
+            // 点某条待办 = 选中它，右侧面板即可编辑；点格子空白处才是选这一天。
+            onSelect: handleSelect,
+            selectedId: selected,
             version: dataVersion,
           })
         }
