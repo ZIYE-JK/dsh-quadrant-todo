@@ -25,11 +25,8 @@ window.__ModuleLoader__.load({
         pickDate: '选择日期', pickTime: '选择时间', clearValue: '清除',
         hourShort: '时', minuteShort: '分',
         tomorrowQuick: '明天', nextMonday: '下周一',
-        category: '分类', noCategory: '无分类', categoryManage: '管理分类', categoryEmpty: '暂无分类',
+        category: '分类', noCategory: '无分类', categoryEmpty: '暂无分类', categoryNamePlaceholder: '分类名称',
         categoryCount: '{count} 条',
-        categoryHint: '分类不是预先设定的：它来自待办里填写的分类名，某条待办写了新名字，这里就会多一个。删掉一个分类，会让它的待办回到「无分类」。',
-        rename: '重命名', deleteOne: '删除', confirmDelete: '确认删除',
-        saveRename: '保存', cancelRename: '取消',
         dialogNew: '新建待办', dialogEdit: '编辑待办',
         fieldTitle: '标题', fieldNote: '备注', fieldDate: '日期', fieldTime: '时间',
         fieldPriority: '优先级', fieldCategory: '分类',
@@ -124,11 +121,8 @@ window.__ModuleLoader__.load({
         pickDate: 'Pick a date', pickTime: 'Pick a time', clearValue: 'Clear',
         hourShort: 'Hr', minuteShort: 'Min',
         tomorrowQuick: 'Tomorrow', nextMonday: 'Next Monday',
-        category: 'Category', noCategory: 'No category', categoryManage: 'Manage categories', categoryEmpty: 'No categories',
+        category: 'Category', noCategory: 'No category', categoryEmpty: 'No categories', categoryNamePlaceholder: 'Category name',
         categoryCount: '{count} items',
-        categoryHint: 'Categories are not predefined: they come from the category names entered on todos, so a new name adds one here. Deleting a category moves its todos back to "No category".',
-        rename: 'Rename', deleteOne: 'Delete', confirmDelete: 'Confirm delete',
-        saveRename: 'Save', cancelRename: 'Cancel',
         dialogNew: 'New todo', dialogEdit: 'Edit todo',
         fieldTitle: 'Title', fieldNote: 'Note', fieldDate: 'Date', fieldTime: 'Time',
         fieldPriority: 'Priority', fieldCategory: 'Category',
@@ -332,6 +326,12 @@ window.__ModuleLoader__.load({
       categoryName: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       categoryCount: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
       newCategoryBtn: { display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', margin: '8px 12px', borderRadius: 6, border: '0.5px dashed var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', justifyContent: 'center' },
+      // 「+ 新建分类」就地展开的一行输入：不再走旧的「管理分类」弹窗。
+      newCategoryBox: { display: 'flex', flexDirection: 'column', gap: 4, margin: '0 12px 8px' },
+      newCategoryRow: { display: 'flex', alignItems: 'center', gap: 6 },
+      newCategoryInput: { flex: 1, minWidth: 0, height: 30, boxSizing: 'border-box', padding: '0 8px', borderRadius: 6, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontSize: 12.5, fontFamily: 'inherit' },
+      newCategoryConfirm: { flex: 'none', height: 30, padding: '0 10px', borderRadius: 6, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 12, cursor: 'pointer' },
+      newCategoryError: { fontSize: 11, lineHeight: '15px', color: 'var(--dsw-alias-state-error-primary)' },
       // Top bar
       quickAdd: { flex: 1, height: 40, padding: '0 14px', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, outline: 'none', fontFamily: 'inherit', marginRight: 12 },
       topBarRight: { display: 'flex', alignItems: 'center', gap: 8, flex: 'none' },
@@ -405,7 +405,11 @@ window.__ModuleLoader__.load({
       popItem: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 30, padding: '0 8px', border: 'none', borderRadius: 6, color: 'var(--dsw-alias-label-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', background: 'transparent' },
       popCount: { marginLeft: 'auto', flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
       popSep: { height: '0.5px', margin: 4, background: 'var(--dsw-alias-border-l2)' },
-      popManage: { display: 'flex', alignItems: 'center', width: '100%', height: 30, padding: '0 8px', border: 'none', borderRadius: 6, color: 'var(--dsw-alias-state-business-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', background: 'transparent' },
+      popCreate: { display: 'flex', alignItems: 'center', width: '100%', height: 30, padding: '0 8px', border: 'none', borderRadius: 6, color: 'var(--dsw-alias-state-business-primary)', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', background: 'transparent' },
+      popCreateRow: { display: 'flex', alignItems: 'center', gap: 6 },
+      popCreateInput: { flex: 1, minWidth: 0, height: 28, boxSizing: 'border-box', padding: '0 8px', borderRadius: 6, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontSize: 12.5, fontFamily: 'inherit' },
+      popCreateConfirm: { flex: 'none', height: 28, padding: '0 10px', borderRadius: 6, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 12, cursor: 'pointer' },
+      popCreateError: { padding: '4px 4px 0', fontSize: 11, lineHeight: '15px', color: 'var(--dsw-alias-state-error-primary)' },
       comboClear: { position: 'absolute', top: 0, right: 0, width: 30, height: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: 8, color: 'var(--dsw-alias-label-tertiary)', cursor: 'pointer', background: 'transparent' },
       // Picker
       pickerTrigger: { width: '100%', height: 32, boxSizing: 'border-box', padding: '0 10px', borderRadius: 8, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left', cursor: 'pointer' },
@@ -1086,23 +1090,69 @@ window.__ModuleLoader__.load({
     }
 
     // --- Components ---
-    function CategoryCombo({ t, value, categories, onChange, onManage }) {
+    /**
+     * 计划分类选择器。输入框既是「直接填写分类名」，也是「过滤列表」；
+     * 弹层底部不再是「管理分类」弹窗入口，而是就地新建：
+     * 点「+ 新建分类」把底栏换成 [输入][确定]，成功后选中新分类并关闭弹层。
+     */
+    function CategoryCombo({ t, value, categories, onChange, onCreateCategory }) {
       const [open, setOpen] = useState(false)
       const [query, setQuery] = useState('')
-      const close = useCallback(() => setOpen(false), [])
+      // 新建成功后把名字并进可见列表：调用方（详情面板 / 新建弹窗）各自持有一份
+      // categories，可能还没重新拉取，不能等它们刷新才让新分类出现在列表里。
+      const [createdNames, setCreatedNames] = useState([])
+      const [creating, setCreating] = useState(false)
+      const [draft, setDraft] = useState('')
+      const [saving, setSaving] = useState(false)
+      const [createError, setCreateError] = useState(null)
+
+      const resetCreate = useCallback(() => {
+        setCreating(false)
+        setDraft('')
+        setCreateError(null)
+      }, [])
+      const close = useCallback(() => { setOpen(false); resetCreate() }, [resetCreate])
       const popover = useAnchoredPopover(open, CATEGORY_POP.width, CATEGORY_POP.height, close)
 
       const openAll = () => {
         setQuery('')
+        resetCreate()
         setOpen(true)
       }
+
+      const rows = useMemo(() => {
+        const known = new Set(categories.map((row) => row.name))
+        const extra = createdNames
+          .filter((name) => !known.has(name))
+          .map((name) => ({ name, count: 0, icon: '' }))
+        return extra.length === 0 ? categories : [...categories, ...extra]
+      }, [categories, createdNames])
 
       const text = asText(value)
       const needle = query.trim().toLowerCase()
       const visible = needle === ''
-        ? categories
-        : categories.filter((row) => row.name.toLowerCase().includes(needle))
+        ? rows
+        : rows.filter((row) => row.name.toLowerCase().includes(needle))
       const countLabel = t('categoryCount')
+
+      const submitCreate = async () => {
+        const name = draft.trim()
+        if (name === '' || saving) return
+        setSaving(true)
+        setCreateError(null)
+        try {
+          await onCreateCategory?.(name)
+          setCreatedNames((prev) => (prev.includes(name) ? prev : [...prev, name]))
+          onChange(name)
+          setQuery('')
+          resetCreate()
+          close()
+        } catch (err) {
+          setCreateError(err instanceof Error && err.message ? err.message : t('requestFailed'))
+        } finally {
+          setSaving(false)
+        }
+      }
 
       return h('div', {
         ref: popover.anchorRef,
@@ -1154,12 +1204,43 @@ window.__ModuleLoader__.load({
                 h('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, row.name),
                 h('span', { style: S.popCount }, typeof countLabel === 'function' ? countLabel(row.count) : String(countLabel).replace('{count}', String(row.count)))))),
             h('div', { style: S.popSep, 'aria-hidden': 'true' }),
-            h('button', {
-              type: 'button',
-              className: 'td-btn',
-              style: S.popManage,
-              onClick: () => { close(); onManage?.() },
-            }, t('categoryManage')))
+            creating
+              ? h('div', null,
+                  h('div', { style: S.popCreateRow },
+                    h('input', {
+                      className: 'td-input',
+                      autoFocus: true,
+                      style: S.popCreateInput,
+                      value: draft,
+                      placeholder: t('categoryNamePlaceholder'),
+                      'aria-label': t('categoryNamePlaceholder'),
+                      disabled: saving,
+                      onChange: (event) => setDraft(event.target.value),
+                      onKeyDown: (event) => {
+                        if (event.nativeEvent?.isComposing === true) return
+                        if (event.key === 'Enter') { event.preventDefault?.(); void submitCreate() }
+                        if (event.key === 'Escape') {
+                          event.preventDefault?.()
+                          event.stopPropagation?.()
+                          resetCreate()
+                        }
+                      },
+                    }),
+                    h('button', {
+                      type: 'button',
+                      className: 'td-btn td-primary',
+                      style: S.popCreateConfirm,
+                      disabled: saving || draft.trim() === '',
+                      onClick: () => void submitCreate(),
+                    }, t('confirm'))),
+                  createError !== null ? h('div', { style: S.popCreateError }, createError) : null)
+              : h('button', {
+                  type: 'button',
+                  className: 'td-btn',
+                  style: S.popCreate,
+                  'aria-label': t('newCategory'),
+                  onClick: () => { setDraft(''); setCreateError(null); setCreating(true) },
+                }, '+ ' + t('newCategory')))
         : null)
     }
 
@@ -1393,207 +1474,6 @@ window.__ModuleLoader__.load({
             onClick: () => closeWith(''),
           }, t('clearValue')))
         : null)
-    }
-
-    function CategoryDialog({ t, onClose, onChanged }) {
-      const [rows, setRows] = useState(null)
-      const [loadFailed, setLoadFailed] = useState(false)
-      const [editing, setEditing] = useState(null)
-      const [confirming, setConfirming] = useState(null)
-      const [saving, setSaving] = useState(false)
-      const [error, setError] = useState(null)
-
-      const alive = useRef(true)
-      const closeRef = useRef(onClose)
-      const tRef = useRef(t)
-      const confirmTimer = useRef(null)
-
-      useEffect(() => { tRef.current = t }, [t])
-
-      const clearConfirmTimer = useCallback(() => {
-        if (confirmTimer.current !== null) {
-          window.clearTimeout(confirmTimer.current)
-          confirmTimer.current = null
-        }
-      }, [])
-
-      useEffect(() => {
-        alive.current = true
-        return () => {
-          alive.current = false
-          clearConfirmTimer()
-        }
-      }, [clearConfirmTimer])
-
-      useEffect(() => { closeRef.current = onClose }, [onClose])
-
-      const load = useCallback(async () => {
-        try {
-          const result = await fetchApi('categories', {}, tRef.current)
-          if (!alive.current) return
-          setRows(normalizeCategories(result))
-          setLoadFailed(false)
-        } catch (err) {
-          if (!alive.current) return
-          console.error('[dsh-sidebar-todo] categories failed', err)
-          setRows([])
-          setLoadFailed(true)
-        }
-      }, [])
-
-      useEffect(() => { void load() }, [load])
-
-      useEffect(() => {
-        const onKeyDown = (event) => {
-          if (event.key !== 'Escape') return
-          event.stopPropagation?.()
-          closeRef.current()
-        }
-        document.addEventListener('keydown', onKeyDown)
-        return () => document.removeEventListener('keydown', onKeyDown)
-      }, [])
-
-      const refreshAfterWrite = useCallback(async () => {
-        await onChanged?.()
-        await load()
-      }, [load, onChanged])
-
-      const startRename = (name) => {
-        clearConfirmTimer()
-        setConfirming(null)
-        setError(null)
-        setEditing({ from: name, value: name })
-      }
-
-      const submitRename = async () => {
-        if (editing === null || saving) return
-        const to = editing.value.trim()
-        if (to === '') return
-        if (to === editing.from) { setEditing(null); return }
-        setSaving(true)
-        setError(null)
-        try {
-          await fetchApi('renameCategory', { from: editing.from, to }, tRef.current)
-          if (!alive.current) return
-          setEditing(null)
-          await refreshAfterWrite()
-        } catch (err) {
-          if (!alive.current) return
-          setError(err instanceof Error && err.message ? err.message : tRef.current('requestFailed'))
-        } finally {
-          if (alive.current) setSaving(false)
-        }
-      }
-
-      const requestDelete = async (name) => {
-        if (saving) return
-        setError(null)
-        if (confirming !== name) {
-          clearConfirmTimer()
-          setEditing(null)
-          setConfirming(name)
-          confirmTimer.current = window.setTimeout(() => {
-            confirmTimer.current = null
-            setConfirming(null)
-          }, 3000)
-          return
-        }
-        clearConfirmTimer()
-        setConfirming(null)
-        setSaving(true)
-        try {
-          await fetchApi('clearCategory', { name }, tRef.current)
-          if (!alive.current) return
-          setEditing(null)
-          await refreshAfterWrite()
-        } catch (err) {
-          if (!alive.current) return
-          setError(err instanceof Error && err.message ? err.message : tRef.current('requestFailed'))
-        } finally {
-          if (alive.current) setSaving(false)
-        }
-      }
-
-      const countLabel = t('categoryCount')
-
-      return h('div', {
-        className: 'td-overlay',
-        style: S.overlay,
-        onClick: (event) => { if (event.target === event.currentTarget) onClose() },
-      },
-      h('div', { className: 'td-dialog', style: S.dialog, role: 'dialog', 'aria-modal': 'true', 'aria-label': t('category') },
-        h('div', { style: S.dialogHead }, t('category')),
-        h('div', { style: { marginBottom: 10, fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' } }, t('categoryHint')),
-        loadFailed ? h('div', { style: S.dialogError }, t('failed')) : null,
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 320, overflowY: 'auto', marginTop: 4 } },
-          rows === null
-            ? h('div', { style: { padding: '18px 8px', textAlign: 'center', fontSize: 12.5, color: 'var(--dsw-alias-label-tertiary)' } }, t('loading'))
-            : rows.length === 0
-              ? h('div', { style: { padding: '18px 8px', textAlign: 'center', fontSize: 12.5, color: 'var(--dsw-alias-label-tertiary)' } }, t('categoryEmpty'))
-              : rows.map((row) => {
-                  const renaming = editing !== null && editing.from === row.name
-                  const confirmingThis = confirming === row.name
-                  return h('div', { key: row.name, className: 'td-row', style: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 34, padding: '0 8px', borderRadius: 6 } },
-                    renaming
-                      ? h('input', {
-                          className: 'td-input',
-                          autoFocus: true,
-                          style: { ...S.input, height: 28, flex: 1, minWidth: 0 },
-                          value: editing.value,
-                          'aria-label': t('rename'),
-                          onChange: (event) => setEditing((prev) => (prev === null ? prev : { ...prev, value: event.target.value })),
-                          onKeyDown: (event) => {
-                            if (event.nativeEvent?.isComposing === true) return
-                            if (event.key === 'Enter') { event.preventDefault?.(); void submitRename() }
-                            if (event.key === 'Escape') { event.preventDefault?.(); event.stopPropagation?.(); setEditing(null) }
-                          },
-                        })
-                      : h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 } }, row.name),
-                    h('span', { style: { flex: 'none', minWidth: 46, textAlign: 'right', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' } }, typeof countLabel === 'function' ? countLabel(row.count) : String(countLabel).replace('{count}', String(row.count))),
-                    renaming
-                      ? [
-                          h('button', {
-                            key: 'save',
-                            type: 'button',
-                            className: 'td-btn td-primary',
-                            style: { flex: 'none', height: 26, padding: '0 9px', borderRadius: 6, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 11.5, cursor: 'pointer' },
-                            disabled: saving || editing.value.trim() === '',
-                            onClick: () => void submitRename(),
-                          }, t('saveRename')),
-                          h('button', {
-                            key: 'cancel',
-                            type: 'button',
-                            className: 'td-btn',
-                            style: { flex: 'none', height: 26, padding: '0 9px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-secondary)', fontSize: 11.5, cursor: 'pointer', background: 'transparent' },
-                            disabled: saving,
-                            onClick: () => setEditing(null),
-                          }, t('cancelRename')),
-                        ]
-                      : [
-                          h('button', {
-                            key: 'rename',
-                            type: 'button',
-                            className: 'td-btn',
-                            style: { flex: 'none', height: 26, padding: '0 9px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-secondary)', fontSize: 11.5, cursor: 'pointer', background: 'transparent' },
-                            disabled: saving,
-                            onClick: () => startRename(row.name),
-                          }, t('rename')),
-                          h('button', {
-                            key: 'delete',
-                            type: 'button',
-                            className: 'td-btn',
-                            style: { flex: 'none', height: 26, padding: '0 9px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', color: confirmingThis ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)', borderColor: confirmingThis ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-border-l3)', fontSize: 11.5, cursor: 'pointer', background: 'transparent' },
-                            disabled: saving,
-                            onClick: () => void requestDelete(row.name),
-                          }, confirmingThis ? t('confirmDelete') : t('deleteOne')),
-                        ],
-                  )
-                }),
-        ),
-        error !== null ? h('div', { style: S.dialogError }, error) : null,
-        h('div', { style: S.dialogFoot },
-          h('button', { type: 'button', className: 'td-btn', style: S.btnGhost, onClick: onClose }, t('dismiss'))),
-      ))
     }
 
     function CalendarView({ t, selectedDay, onPickDay, version }) {
@@ -2252,8 +2132,14 @@ window.__ModuleLoader__.load({
           }, h(Icon, { name: 'calendar', size: 18 }))))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onNewCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
       const [selectedDay, setSelectedDay] = useState(null)
+      // 「+ 新建分类」就地展开一行输入：不再打开旧的「管理分类」弹窗。
+      const [creating, setCreating] = useState(false)
+      const [draft, setDraft] = useState('')
+      const [saving, setSaving] = useState(false)
+      const [createError, setCreateError] = useState(null)
+      const createWrapRef = useRef(null)
       const cells = monthGrid(monthCursor.year, monthCursor.month)
       const monthKey = `${monthCursor.year}-${String(monthCursor.month + 1).padStart(2, '0')}`
       const todayKey = dateKeyOf(new Date())
@@ -2269,6 +2155,41 @@ window.__ModuleLoader__.load({
         setSelectedDay(key)
         onSelectDay(key)
       }
+
+      const cancelCreate = () => {
+        setCreating(false)
+        setDraft('')
+        setCreateError(null)
+      }
+
+      const submitCreate = async () => {
+        const name = draft.trim()
+        if (name === '' || saving) return
+        setSaving(true)
+        setCreateError(null)
+        try {
+          await onCreateCategory?.(name)
+          setDraft('')
+          setCreating(false)
+        } catch (err) {
+          // 宿主会给出具体原因（「分类名必填」/「分类名过长（上限 24 字）」）。
+          setCreateError(err instanceof Error && err.message ? err.message : t('requestFailed'))
+        } finally {
+          setSaving(false)
+        }
+      }
+
+      // 点开输入行后点别处即取消（Escape 也在输入行里处理）。
+      useEffect(() => {
+        if (!creating) return undefined
+        const onPointerDown = (event) => {
+          const node = createWrapRef.current
+          if (node !== null && typeof node.contains === 'function' && node.contains(event.target)) return
+          cancelCreate()
+        }
+        document.addEventListener('pointerdown', onPointerDown)
+        return () => document.removeEventListener('pointerdown', onPointerDown)
+      }, [creating])
 
       return h('div', { style: S.leftPanel },
         // 收集箱：分组里只有它自己一个成员，原来的「标题 + 唯一成员」等于把同一个词
@@ -2353,13 +2274,42 @@ window.__ModuleLoader__.load({
           h('span', { style: S.categoryName }, cat.name),
           h('span', { style: S.categoryCount }, String(cat.count)))),
 
-        // New category button
-        h('button', {
-          type: 'button',
-          className: 'td-btn',
-          style: S.newCategoryBtn,
-          onClick: onNewCategory,
-        }, '+ ' + t('newCategory'))))
+        // 新建分类：按钮下面就地展开输入行，新建后宿主会让它出现在上面的分类列表里。
+        h('div', { ref: createWrapRef },
+          h('button', {
+            type: 'button',
+            className: 'td-btn',
+            style: S.newCategoryBtn,
+            'aria-expanded': creating ? 'true' : 'false',
+            onClick: () => { if (creating) cancelCreate(); else { setDraft(''); setCreateError(null); setCreating(true) } },
+          }, '+ ' + t('newCategory')),
+          creating
+            ? h('div', { style: S.newCategoryBox },
+                h('div', { style: S.newCategoryRow },
+                  h('input', {
+                    className: 'td-input',
+                    autoFocus: true,
+                    style: S.newCategoryInput,
+                    value: draft,
+                    placeholder: t('categoryNamePlaceholder'),
+                    'aria-label': t('categoryNamePlaceholder'),
+                    disabled: saving,
+                    onChange: (event) => setDraft(event.target.value),
+                    onKeyDown: (event) => {
+                      if (event.nativeEvent?.isComposing === true) return
+                      if (event.key === 'Enter') { event.preventDefault?.(); void submitCreate() }
+                      if (event.key === 'Escape') { event.preventDefault?.(); event.stopPropagation?.(); cancelCreate() }
+                    },
+                  }),
+                  h('button', {
+                    type: 'button',
+                    className: 'td-btn td-primary',
+                    style: S.newCategoryConfirm,
+                    disabled: saving || draft.trim() === '',
+                    onClick: () => void submitCreate(),
+                  }, t('confirm'))),
+                createError !== null ? h('div', { style: S.newCategoryError }, createError) : null)
+            : null)))
     }
 
     /**
@@ -2718,7 +2668,7 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
     }
 
-    function DetailPanel({ t, item, categories, onManageCategories, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove }) {
+    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove }) {
       const [title, setTitle] = useState(asText(item.title))
       const [note, setNote] = useState(asText(item.note))
       const [category, setCategory] = useState(asText(item.category))
@@ -2956,7 +2906,7 @@ window.__ModuleLoader__.load({
                   value: category,
                   categories,
                   onChange: (next) => { setCategory(next); markDirty() },
-                  onManage: onManageCategories,
+                  onCreateCategory,
                 }))
             : null,
 
@@ -3143,7 +3093,6 @@ window.__ModuleLoader__.load({
       const [activeFilter, setActiveFilter] = useState('all')
       const [selected, setSelected] = useState(null)
       const [dialog, setDialog] = useState(null)
-      const [categoryOpen, setCategoryOpen] = useState(false)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
       const [calendarItems, setCalendarItems] = useState([])
       const [settings, setSettings] = useState({ notify: { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, quietHours: { enabled: false, start: '22:00', end: '08:00' } } })
@@ -3204,7 +3153,7 @@ window.__ModuleLoader__.load({
         }
       }, [activeFilter])
 
-      const mutate = useCallback(async (method, payload) => {
+      const mutate = useCallback(async (method, payload, options) => {
         try {
           await fetchApi(method, payload, tRef.current)
           dismissActionError()
@@ -3213,11 +3162,25 @@ window.__ModuleLoader__.load({
           return true
         } catch (err) {
           console.error(`[dsh-sidebar-todo] ${method} failed`, err)
+          // 新建分类要把宿主的具体原因（「分类名必填」/「分类名过长（上限 24 字）」）
+          // 显示在输入行上，所以允许调用方选择把错误原样抛回；其余调用维持通用错误条。
+          if (options?.rethrow === true) throw err
           showActionError()
           await reload()
           return false
         }
       }, [reload, dismissActionError, showActionError])
+
+      /**
+       * 新建分类：走 mutate 拿到「重载 + dataVersion 自增」，
+       * 失败时把宿主的消息抛回给调用方（左栏输入行 / 分类选择器）。
+       */
+      const createCategory = useCallback(async (name) => {
+        const trimmed = asText(name).trim()
+        if (trimmed === '') return false
+        await mutate('addCategory', { name: trimmed }, { rethrow: true })
+        return true
+      }, [mutate])
 
       // Fetch settings on mount
       useEffect(() => {
@@ -3469,7 +3432,7 @@ window.__ModuleLoader__.load({
             onFilterChange: (next) => { setActiveFilter(next); setDayFilter(null) },
             categories: state.categories,
             inboxCount: state.inboxCount,
-            onNewCategory: () => setCategoryOpen(true),
+            onCreateCategory: createCategory,
             onInboxFilter: handleInboxFilter,
             monthCursor,
             onMonthChange: handleMonthChange,
@@ -3485,7 +3448,7 @@ window.__ModuleLoader__.load({
                 t,
                 item: selectedItem,
                 categories: state.categories,
-                onManageCategories: () => setCategoryOpen(true),
+                onCreateCategory: createCategory,
                 onAddSubtask: handleAddSubtask,
                 onToggleSubtask: handleToggleSubtask,
                 onRemoveSubtask: handleRemoveSubtask,
@@ -3527,21 +3490,13 @@ window.__ModuleLoader__.load({
               mutate,
               onClose: () => setDialog(null),
               onSaved: () => setDialog(null),
-              onManageCategories: () => setCategoryOpen(true),
-              escSuspended: categoryOpen,
-            })
-          : null,
-        categoryOpen
-          ? h(CategoryDialog, {
-              t,
-              onClose: () => setCategoryOpen(false),
-              onChanged: reload,
+              onCreateCategory: createCategory,
             })
           : null,
       )
     }
 
-    function TodoDialog({ t, initial, mutate, onClose, onSaved, onManageCategories, escSuspended }) {
+    function TodoDialog({ t, initial, mutate, onClose, onSaved, onCreateCategory }) {
       const editing = initial !== null && initial !== undefined && initial.id !== null && initial.id !== undefined
       const [form, setForm] = useState(() => ({
         id: editing ? initial.id : null,
@@ -3587,7 +3542,6 @@ window.__ModuleLoader__.load({
       }, [])
 
       useEffect(() => {
-        if (escSuspended) return undefined
         const onKeyDown = (event) => {
           if (event.key !== 'Escape') return
           event.stopPropagation?.()
@@ -3595,7 +3549,7 @@ window.__ModuleLoader__.load({
         }
         document.addEventListener('keydown', onKeyDown)
         return () => document.removeEventListener('keydown', onKeyDown)
-      }, [escSuspended])
+      }, [])
 
       useEffect(() => {
         const current = ++seq.current
@@ -3789,7 +3743,7 @@ window.__ModuleLoader__.load({
             value: form.category,
             categories: categoryRows,
             onChange: (next) => setForm((prev) => ({ ...prev, category: next })),
-            onManage: onManageCategories,
+            onCreateCategory,
           })),
 
         h('label', { style: S.field },

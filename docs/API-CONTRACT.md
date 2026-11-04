@@ -41,6 +41,12 @@
 ### 新增接口
 `setAbandoned` `{id, abandoned?}` → 行；agent 工具新增 `action: 'abandon'`
 
+`addCategory` `{name}` → `{name, icon}`：新建一个分类。**分类不再只能由待办派生** ——
+`categories` 返回「被待办用到的」∪「显式新建过的」（后者 `count: 0`），所以一个还没被
+任何待办引用的分类也能存在、能重启后仍在。重名幂等；空名报 `分类名必填`，
+超 24 字报 `分类名过长（上限 24 字）`。
+`setCategoryIcon(name, '')` 只清图标、**不删分类**；删分类走 `clearCategory`。
+
 ## 0. v3 相对 v2 的增量（周视图 + 可改时间）
 
 | 字段 | 说明 |
