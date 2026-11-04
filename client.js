@@ -1043,6 +1043,31 @@ window.__ModuleLoader__.load({
       return time === '' ? short : `${short} ${time}`
     }
 
+    /**
+     * 统一排序（矩阵 / 月视图单元格 / 周视图全天带 / 统计清单共用）：
+     *  1) 未完成在上，已完成在下
+     *  2) 组内：没有时间的（全天）排在有时间的前面
+     *  3) 有时间的：按时间点 / 开始时间升序
+     *  4) 其余（同为全天，或时间相同）：按创建日期升序；再按标题兜底，保证顺序稳定
+     *
+     * `minutesOfTime` 对空值 / 非法值返回 null —— 那就是「全天」的信号；
+     * 时间段的 startTime 是它的开始，时间点的 startTime 就是那个点，两者同一口径。
+     */
+    function compareTodoOrder(a, b) {
+      const doneDelta = Number(Boolean(a.done)) - Number(Boolean(b.done))
+      if (doneDelta !== 0) return doneDelta
+      const aStart = minutesOfTime(a.startTime)
+      const bStart = minutesOfTime(b.startTime)
+      if (aStart === null || bStart === null) {
+        if (aStart !== bStart) return aStart === null ? -1 : 1
+      } else if (aStart !== bStart) {
+        return aStart - bStart
+      }
+      const byCreated = asText(a.createdAt).localeCompare(asText(b.createdAt))
+      if (byCreated !== 0) return byCreated
+      return asText(a.title).localeCompare(asText(b.title))
+    }
+
     function deadlineTitle(item, t) {
       const deadline = deadlineOf(item)
       if (deadline === null) return undefined
@@ -1632,8 +1657,12 @@ window.__ModuleLoader__.load({
                 endTime: i.endTime,
                 quadrant: i.quadrant,
                 abandoned: i.abandoned === true,
+                // 统一排序要用它做「同为全天 / 时间相同」时的兜底，必须跟着适配一起带过来。
+                createdAt: i.createdAt,
               }))
-              .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+              // 这里只有未完成的条目，所以 compareTodoOrder 的第 1 层是空转；
+              // 真正起作用的是「全天在前 → 按开始时间 → 按创建日期」。
+              .sort(compareTodoOrder)
             setStat({ total: items.length, done: items.filter((i) => i.done === true).length, list })
           })
           .catch(() => { if (alive) setStat({ total: 0, done: 0, list: [] }) })
@@ -1716,6 +1745,9 @@ window.__ModuleLoader__.load({
             for (const item of Array.isArray(result.items) ? result.items : []) {
               ;(map[item.date] ??= []).push(item)
             }
+            // 接口按「日期 + 标题」给的顺序，和矩阵 / 周视图对不上；这里逐格套用统一排序，
+            // 于是同一天里「未完成 → 全天 → 有时间」的次序与别处完全一致。
+            for (const key of Object.keys(map)) map[key].sort(compareTodoOrder)
             setByDate(map)
           })
           .catch((err) => {
@@ -1865,6 +1897,9 @@ window.__ModuleLoader__.load({
         if (repeating || start === null) (allDayByDate[key] ??= []).push(item)
         else (timedByDate[key] ??= []).push(item)
       }
+      // 全天带的胶囊也走统一排序。分时网格里的块**不能**碰：它们由 layoutDayBlocks
+      // 按开始时间排好并分道，位置才是对的。
+      for (const key of Object.keys(allDayByDate)) allDayByDate[key].sort(compareTodoOrder)
 
       const rangeLabel = String(t('weekRange'))
         .replace('{from}', formatWeekDayKey(from, t, true))
@@ -2356,8 +2391,7 @@ window.__ModuleLoader__.load({
               : null)))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
-      const [selectedDay, setSelectedDay] = useState(null)
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay }) {
       // 「+ 新建分类」就地展开一行输入：不再打开旧的「管理分类」弹窗。
       const [creating, setCreating] = useState(false)
       const [draft, setDraft] = useState('')
@@ -2376,7 +2410,7 @@ window.__ModuleLoader__.load({
       }
 
       const handleDayClick = (key) => {
-        setSelectedDay(key)
+        // selectedDay 现在由父组件持有（就是 dayFilter），这里只负责上报。
         onSelectDay(key)
       }
 
@@ -3367,8 +3401,10 @@ window.__ModuleLoader__.load({
       const [noticeHidden, setNoticeHidden] = useState(corruptDismissed)
       const [actionError, setActionError] = useState(false)
       const [dataVersion, setDataVersion] = useState(0)
-      // 左栏选中的具体某一天（再点一次取消），只影响矩阵里显示哪些计划。
-      const [dayFilter, setDayFilter] = useState(null)
+      // 左栏选中的具体某一天；**打开时默认就是「今天」** —— null 才表示不筛日期。
+      // 想回到全部，点左栏「全部」：onFilterChange 会把它清回 null。
+      // handleSelectDay 是黏的：再点同一天不会取消（取消只有「全部」这一条路）。
+      const [dayFilter, setDayFilter] = useState(() => dateKeyOf(new Date()))
       const [retrying, setRetrying] = useState(false)
 
       const tRef = useRef(t)
@@ -3621,21 +3657,20 @@ window.__ModuleLoader__.load({
         })
       }
 
-      /** 未完成在前、已完成后在后。完成的行**不再被剔除**。 */
-      const byDoneLast = (rows) => rows.slice().sort((a, b) => Number(Boolean(a.done)) - Number(Boolean(b.done)))
-
       // 矩阵 = 已归入象限的计划（**含已完成**），再叠加可选的按天筛选。
+      // 排序走全局统一的 compareTodoOrder：未完成在上、全天在前、有时间的按开始时间、
+      // 其余按创建日期 —— 与月视图 / 周视图全天带 / 统计清单同一套口径。
       const quadrantItems = useMemo(() => {
         let rows = items.filter((item) => Boolean(item.quadrant))
         if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
-        return byDoneLast(rows)
+        return rows.sort(compareTodoOrder)
       }, [items, dayFilter])
 
       // 收集箱 = 还没有象限的任务。矩阵按象限分组，它们在那里无处可去。
       const inboxItems = useMemo(() => {
         let rows = items.filter((item) => !item.quadrant)
         if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
-        return byDoneLast(rows)
+        return rows.sort(compareTodoOrder)
       }, [items, dayFilter])
 
       const handleSelect = (id) => {
@@ -3737,6 +3772,7 @@ window.__ModuleLoader__.load({
             onMonthChange: handleMonthChange,
             calendarItems,
             onSelectDay: handleSelectDay,
+            selectedDay: dayFilter,
           }),
           activeRailContent(),
           selectedItem
