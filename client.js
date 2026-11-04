@@ -11,6 +11,7 @@ window.__ModuleLoader__.load({
         nav: '待办', title: '待办', new: '新建', search: '搜索待办',
         today: '今天', overdue: '逾期', tomorrow: '明天', week: '本周', month: '本月', later: '以后', stale: '积压',
         unplanned: '未排期', done: '已完成', doneEmpty: '该范围内没有完成记录', empty: '还没有待办',
+        statsUndone: '未完成', statsTotal: '共 {count} 项',
         staleHint: '超过 {n} 天未完成', loading: '加载中…', failed: '读取失败',
         actionFailed: '操作失败，请重试',
         retry: '重试', pickOne: '选一条看详情',
@@ -107,6 +108,7 @@ window.__ModuleLoader__.load({
         nav: 'To-do', title: 'To-do', new: 'New', search: 'Search',
         today: 'Today', overdue: 'Overdue', tomorrow: 'Tomorrow', week: 'This week', month: 'This month', later: 'Later', stale: 'Backlog',
         unplanned: 'Unscheduled', done: 'Completed', doneEmpty: 'No completions in this range', empty: 'No todos yet',
+        statsUndone: 'Not done', statsTotal: '{count} total',
         staleHint: 'Open for more than {n} days', loading: 'Loading…', failed: 'Failed to load',
         actionFailed: 'Action failed, please retry',
         retry: 'Retry', pickOne: 'Select an item',
@@ -245,6 +247,8 @@ window.__ModuleLoader__.load({
       chevronRight: ['M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708'],
       // plus-lg — 新建
       plus: ['M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2'],
+      // pie-chart-fill — 周/月统计卡的抬头
+      chart: ['M15.985 8.5H8.207l-5.5 5.5a8 8 0 0 0 13.277-5.5zM2 13.292A8 8 0 0 1 7.5.015v7.778zM8.5.015V7.5h7.485A8 8 0 0 0 8.5.015'],
       // x-lg — 关闭 / 清除
       x: ['M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z'],
       // check2-square — 侧栏「待办」入口
@@ -504,6 +508,18 @@ window.__ModuleLoader__.load({
       weekResize: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 9, maxHeight: '40%', cursor: 'ns-resize', touchAction: 'none' },
       weekBlockDragging: { zIndex: 5, boxShadow: 'var(--dsw-elevation-panel)' },
       weekNowLine: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 4, pointerEvents: 'none', background: 'var(--dsw-alias-state-error-primary)' },
+      // 周视图下方的统计：两张卡并排，放在周网格的滚动区之外，不会被滚走。
+      statsWrap: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px 16px' },
+      statsCard: { display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-alias-bg-layer-1)', minWidth: 0 },
+      statsHead: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--dsw-alias-label-secondary)' },
+      statsTotal: { marginLeft: 'auto', fontSize: 11, fontWeight: 400, color: 'var(--dsw-alias-label-tertiary)' },
+      statsBody: { display: 'flex', alignItems: 'center', gap: 14 },
+      statsLegend: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 },
+      statsRow: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 },
+      statsSwatch: { width: 8, height: 8, borderRadius: 2, flex: 'none' },
+      statsLabel: { color: 'var(--dsw-alias-label-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      statsCount: { marginLeft: 'auto', fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      focusCol: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden' },
     }
 
     const PLUGIN_CSS = `
@@ -1474,6 +1490,70 @@ window.__ModuleLoader__.load({
             onClick: () => closeWith(''),
           }, t('clearValue')))
         : null)
+    }
+
+    /**
+     * 一张统计卡：环形图 + 图例（已完成 / 未完成 / 合计）。
+     *
+     * 数量按**发生次数**算 —— 用的是日历那份 occurrences，所以「每日站会」一周就是 7 项。
+     * 已放弃的算「未完成」，这样 总数 = 已完成 + 未完成 永远成立。
+     *
+     * 环形图是手绘 SVG：用 stroke-dasharray 画进度弧，不引图表库，也不做弧线三角计算。
+     */
+    function StatsCard({ t, titleKey, from, to, version }) {
+      const [stat, setStat] = useState({ loading: true, total: 0, done: 0 })
+
+      useEffect(() => {
+        let alive = true
+        fetchApi('occurrences', { from, to }, t)
+          .then((res) => {
+            if (!alive) return
+            const items = Array.isArray(res?.items) ? res.items : []
+            setStat({ loading: false, total: items.length, done: items.filter((i) => i.done === true).length })
+          })
+          .catch(() => { if (alive) setStat({ loading: false, total: 0, done: 0 }) })
+        return () => { alive = false }
+      }, [from, to, version])
+
+      const total = stat.total
+      const done = stat.done
+      const undone = total - done
+      const pct = total === 0 ? 0 : Math.round((done / total) * 100)
+
+      const R = 34
+      const C = 2 * Math.PI * R
+      const ring = { fill: 'none', strokeWidth: 8, strokeLinecap: 'round' }
+      const doneColor = 'var(--dsw-alias-state-business-primary)'
+      const undoneColor = 'var(--dsw-alias-state-warn-primary)'
+
+      const legendRow = (color, label, count) => h('div', { style: S.statsRow },
+        h('span', { style: { ...S.statsSwatch, background: color } }),
+        h('span', { style: S.statsLabel }, label),
+        h('span', { style: S.statsCount }, String(count)))
+
+      return h('div', { style: S.statsCard },
+        h('div', { style: S.statsHead },
+          h(Icon, { name: 'chart', size: 13 }),
+          h('span', null, t(titleKey)),
+          h('span', { style: S.statsTotal }, String(t('statsTotal')).replace('{count}', String(total)))),
+        h('div', { style: S.statsBody },
+          h('svg', { width: 84, height: 84, viewBox: '0 0 84 84', 'aria-hidden': 'true', style: { flex: 'none' } },
+            h('circle', { cx: 42, cy: 42, r: R, ...ring, stroke: undoneColor, opacity: total === 0 ? 0.28 : 1 }),
+            total > 0 && done > 0
+              ? h('circle', {
+                  cx: 42, cy: 42, r: R, ...ring,
+                  stroke: doneColor,
+                  strokeDasharray: `${(done / total) * C} ${C}`,
+                  transform: 'rotate(-90 42 42)',
+                })
+              : null,
+            h('text', {
+              x: 42, y: 42, textAnchor: 'middle', dominantBaseline: 'central',
+              fontSize: 16, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)',
+            }, `${pct}%`)),
+          h('div', { style: S.statsLegend },
+            legendRow(doneColor, t('done'), done),
+            legendRow(undoneColor, t('statsUndone'), undone))))
     }
 
     function CalendarView({ t, selectedDay, onPickDay, version }) {
@@ -3383,14 +3463,30 @@ window.__ModuleLoader__.load({
             version: dataVersion,
           })
         }
-        // 专注 = 周视图（7 天 × 0-24 时段）
+        // 专注 = 周视图（7 天 × 0-24 时段）+ 下方本周 / 本月统计
         if (activeRail === 'focus') {
-          return h(WeekView, {
-            t,
-            onSelect: handleSelect,
-            onReschedule: handleReschedule,
-            version: dataVersion,
-          })
+          // 统计固定看「当前」这一周 / 这一月，不跟着周视图翻页走（标签写的就是本周/本月）。
+          const statsToday = dateKeyOf(new Date())
+          const statsMonthKey = statsToday.slice(0, 7)
+          const statsAt = new Date()
+          const weekFrom = mondayOfKey(statsToday)
+          return h('div', { style: S.focusCol },
+            h(WeekView, {
+              t,
+              onSelect: handleSelect,
+              onReschedule: handleReschedule,
+              version: dataVersion,
+            }),
+            h('div', { style: S.statsWrap },
+              h(StatsCard, {
+                t, titleKey: 'week', version: dataVersion,
+                from: weekFrom, to: shiftKeyLocal(weekFrom, 6),
+              }),
+              h(StatsCard, {
+                t, titleKey: 'month', version: dataVersion,
+                from: `${statsMonthKey}-01`,
+                to: dateKeyOf(new Date(statsAt.getFullYear(), statsAt.getMonth() + 1, 0)),
+              })))
         }
         // 收集箱单独一屏：矩阵只吃有象限的任务，否则这些任务在界面上无处可见。
         if (activeFilter === '__inbox__') {
