@@ -145,7 +145,7 @@ test('a 时间点 fires 到期 at that point (point IS the deadline)', async () 
 })
 
 test('REGRESSION: a 09:30-10:00 block created at 09:33 must not fire immediately', async () => {
-  // 老板实际遇到的：建完 22 秒就弹「到期 · 截止 09:30」。
+  // 实际遇到的：建完 22 秒就弹「到期 · 截止 09:30」。
   const item = {
     id: 't3', title: '提供B2B数据图表-PPT用', dueDate: '2026-11-04',
     startTime: '09:30', endTime: '10:00', bucket: 'today',
