@@ -1,6 +1,6 @@
 {
-  "name": "dsh-sidebar-todo",
-  "version": "0.3.0",
+  "name": "dsh-quadrant-todolist",
+  "version": "1.0.0",
   "description": "DeepSeek Harness 侧栏待办（本地分支改造）：四象限矩阵 + 收集箱 + 子计划 + 月视图日历 + 循环任务 + 分类图标 + 系统通知 / 飞书通知，agent 可读写",
   "type": "module",
   "license": "MIT",
@@ -20,11 +20,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Natte/dsh-sidebar-todo.git"
+    "url": "git+https://github.com/ZIYE-JK/dsh-quadrant-todolist.git"
   },
-  "homepage": "https://github.com/Natte/dsh-sidebar-todo#readme",
+  "homepage": "https://github.com/ZIYE-JK/dsh-quadrant-todolist#readme",
   "bugs": {
-    "url": "https://github.com/Natte/dsh-sidebar-todo/issues"
+    "url": "https://github.com/ZIYE-JK/dsh-quadrant-todolist/issues"
   },
   "exports": {
     ".": "./index.js",

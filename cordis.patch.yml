@@ -1,5 +1,5 @@
 - insert:
-    - id: dsh-sidebar-todo
-      name: dsh-sidebar-todo
+    - id: dsh-quadrant-todolist
+      name: dsh-quadrant-todolist
       config:
         staleDays: 7
