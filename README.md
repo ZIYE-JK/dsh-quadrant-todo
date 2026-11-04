@@ -150,3 +150,20 @@ plugin_manager install_bundle  target: <本仓库目录>
 node --test          # 143 个测试
 node --check client.js
 ```
+
+## 许可
+
+MIT。`LICENSE` 里有两行版权：
+
+```
+Copyright (c) 2026 Natte      ← 上游 dsh-sidebar-todo 的作者
+Copyright (c) 2026 ZIYE-JK    ← 本仓库
+```
+
+本项目从 Natte 的 `dsh-sidebar-todo@0.2.3` 起步，之后被大幅重写：界面、交互模型、
+日历与统计视图、通知链路、法定工作日与艾宾浩斯重复、以及整套测试都是新增的。
+上游的版权声明按 MIT 的要求保留（针对仍然派生自它的那部分代码），第二行覆盖新增工作。
+
+> `LICENSE` 本身保持**逐字标准的 MIT 文本**——中间插入任何说明都会让 GitHub 的
+> 许可证识别失败（显示 `NOASSERTION` 而不是 `MIT`）。所以这段说明放在这里。
+
