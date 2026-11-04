@@ -72,7 +72,7 @@ window.__ModuleLoader__.load({
         notifyDenied: '通知权限被拒绝，请在系统设置中允许通知',
         notifyUnsupported: '当前环境不支持系统通知',
         selectCategory: '选择分类', selectQuadrant: '选择象限', selectRepeat: '选择重复规则',
-        addTodo: '新建待办', calendarIcon: '日历', active: '当前',
+        addTodo: '新建待办', active: '当前',
         subtaskDelete: '删除子计划', subtaskDone: '子计划完成', subtaskUndone: '子计划未完成',
         inboxCount: '收集箱 {count}',
         quadrantCount: '{count} 条',
@@ -169,7 +169,7 @@ window.__ModuleLoader__.load({
         notifyDenied: 'Notification permission denied. Please enable notifications for this app.',
         notifyUnsupported: 'System notifications not supported in this environment',
         selectCategory: 'Select category', selectQuadrant: 'Select quadrant', selectRepeat: 'Select repeat',
-        addTodo: 'New todo', calendarIcon: 'Calendar', active: 'Active',
+        addTodo: 'New todo', active: 'Active',
         subtaskDelete: 'Delete subtask', subtaskDone: 'Subtask done', subtaskUndone: 'Subtask undone',
         inboxCount: 'Inbox {count}',
         quadrantCount: '{count} items',
@@ -2063,7 +2063,7 @@ window.__ModuleLoader__.load({
         h('div', { style: S.railAvatar, onClick: onAvatarClick }, '😼'))
     }
 
-    function TopBar({ t, onQuickAdd, onToggleCalendar, notificationOn, calendarActive, settings, onSettingsChange }) {
+    function TopBar({ t, onQuickAdd, notificationOn, settings, onSettingsChange }) {
       const [notifyOpen, setNotifyOpen] = useState(false)
       const [permissionState, setPermissionState] = useState('default')
       const [savingSettings, setSavingSettings] = useState(false)
@@ -2244,14 +2244,7 @@ window.__ModuleLoader__.load({
                     disabled: savingSettings,
                     onClick: handleSaveSettings,
                   }, savingSettings ? t('loading') : t('save')))
-              : null),
-          h('button', {
-            type: 'button',
-            className: 'td-btn',
-            style: { ...S.iconBtn, ...(calendarActive ? S.iconBtnActive : null) },
-            'aria-label': t('calendarIcon'),
-            onClick: onToggleCalendar,
-          }, h(Icon, { name: 'calendar', size: 18 }))))
+              : null)))
     }
 
     function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay }) {
@@ -3568,9 +3561,7 @@ window.__ModuleLoader__.load({
         h(TopBar, {
           t,
           onQuickAdd: handleQuickAdd,
-          onToggleCalendar: () => setActiveRail((prev) => (prev === 'view' ? 'plan' : 'view')),
           notificationOn,
-          calendarActive: activeRail === 'view',
           settings,
           onSettingsChange: handleSaveSettings,
         }),
