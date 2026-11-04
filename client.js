@@ -510,10 +510,17 @@ window.__ModuleLoader__.load({
       // 月视图条目 = 周视图全天胶囊（S.weekChip）的同款做法：一条一行、圆角、省略号，
       // 象限色走「低透明度底色 + 左侧 3px 强调边」（accent 由调用处用 color-mix 注入），
       // 高度锁在 17px，别挤到一格只放得下一两条。
-      calendarViewItem: { flex: 'none', boxSizing: 'border-box', height: 17, padding: '1px 4px', borderRadius: 4, borderLeft: '3px solid transparent', fontSize: 10.5, lineHeight: '15px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      // 与周视图全天胶囊（S.weekChip）尺寸同源：同样**不写死 height**，
+      // 高度由 padding 1px + lineHeight 15px 自然得到 17px。写死 height 一旦
+      // 与 lineHeight 不同步，字就会被挤在框里（行高显得小、字显得大）。
+      calendarViewItem: { flex: 'none', display: 'block', width: '100%', boxSizing: 'border-box', padding: '1px 4px', borderRadius: 4, borderLeft: '3px solid transparent', fontSize: 10.5, lineHeight: '15px', color: 'var(--dsw-alias-label-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       // 胶囊是个真 <button>（点了要打开右侧编辑面板），所以要把浏览器默认外观清掉，
       // 并补上 button 不会自己继承的字体与左对齐。宽度撑满，便于点。
-      calendarViewItemBtn: { width: '100%', textAlign: 'left', font: 'inherit', fontSize: 10.5, border: 'none', borderLeft: '3px solid transparent', background: 'transparent', cursor: 'pointer', display: 'block' },
+      // 只做 button 的「去默认外观」。**绝不能用 `font: 'inherit'` 简写**——
+      // 它会把 font-size 连同 line-height 一起重置成继承值，而这条样式在
+      // calendarViewItem 之后展开，于是刚设好的 lineHeight 15px 被冲掉，
+      // 只剩 fontSize 被后一行救回来。表现就是「行高小、字体大」。
+      calendarViewItemBtn: { textAlign: 'left', fontFamily: 'inherit', fontSize: 10.5, lineHeight: '15px', border: 'none', borderLeft: '3px solid transparent', background: 'transparent', cursor: 'pointer' },
       // 正在编辑的那条：给个描边，和右侧面板对得上。
       calendarViewItemSelected: { boxShadow: '0 0 0 1.5px var(--dsw-alias-state-business-primary)' },
       // 完成态保留原来的删除线 + 三级色。
