@@ -68,6 +68,8 @@ window.__ModuleLoader__.load({
         notificationToggle: '通知', notificationOn: '通知已开启', notificationOff: '通知已关闭',
         notifySettings: '通知设置', systemNotify: '系统通知', feishuNotify: '飞书通知',
         leadMinutes: '提前提醒分钟数', leadMinutesShort: '分钟', quietHours: '静默时段',
+        checkpoints: '检查点时刻', checkpointsHint: '逗号分隔，如 11:00, 16:00；留空则关闭',
+        checkpointTitle: '检查点 · 还有 {count} 项未完成', checkpointSeparator: '、',
         testNotify: '测试', testNotifySuccess: '测试通知已发送', testNotifyFail: '测试通知发送失败',
         notifyDenied: '通知权限被拒绝，请在系统设置中允许通知',
         notifyUnsupported: '当前环境不支持系统通知',
@@ -166,6 +168,8 @@ window.__ModuleLoader__.load({
         notificationToggle: 'Notifications', notificationOn: 'Notifications on', notificationOff: 'Notifications off',
         notifySettings: 'Notification settings', systemNotify: 'System notifications', feishuNotify: 'Feishu notifications',
         leadMinutes: 'Lead time (minutes)', leadMinutesShort: 'min', quietHours: 'Quiet hours',
+        checkpoints: 'Checkpoint times', checkpointsHint: 'Comma-separated, e.g. 11:00, 16:00; empty to disable',
+        checkpointTitle: 'Checkpoint · {count} still open', checkpointSeparator: ', ',
         testNotify: 'Test', testNotifySuccess: 'Test notification sent', testNotifyFail: 'Test notification failed',
         notifyDenied: 'Notification permission denied. Please enable notifications for this app.',
         notifyUnsupported: 'System notifications not supported in this environment',
@@ -2239,7 +2243,16 @@ window.__ModuleLoader__.load({
       const [permissionState, setPermissionState] = useState('default')
       const [savingSettings, setSavingSettings] = useState(false)
       const [testResult, setTestResult] = useState(null)
+      // 检查点输入框的原始文本：设置里存的是数组，边打字边归一化会把「11:0」这类半成品吞掉，
+      // 所以文本自己留一份（每次打开弹层再从设置同步一次）。
+      const [checkpointsText, setCheckpointsText] = useState(() => (settings.notify.checkpoints ?? []).join(', '))
       const notifyRef = useRef(null)
+
+      useEffect(() => {
+        if (!notifyOpen) return undefined
+        setCheckpointsText((settings.notify.checkpoints ?? []).join(', '))
+        return undefined
+      }, [notifyOpen])
 
       useEffect(() => {
         if (typeof Notification !== 'undefined') {
@@ -2372,6 +2385,22 @@ window.__ModuleLoader__.load({
                       value: settings.notify.leadMinutes,
                       onChange: (e) => setLeadMinutes(e.target.value),
                     })),
+                  h('div', { style: S.notifyRow },
+                    h('span', { style: S.notifyLabel }, t('checkpoints')),
+                    h('input', {
+                      className: 'td-input',
+                      style: { ...S.notifyInput, width: 132 },
+                      type: 'text',
+                      'aria-label': t('checkpoints'),
+                      placeholder: '11:00, 16:00',
+                      value: checkpointsText,
+                      onChange: (e) => {
+                        // 文本原样留着（打字中途不作格式化），落库的只取合法项；留空 = 关掉检查点。
+                        setCheckpointsText(e.target.value)
+                        onSettingsChange({ ...settings, notify: { ...settings.notify, checkpoints: parseCheckpoints(e.target.value) } })
+                      },
+                    })),
+                  h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', padding: '0 0 2px' } }, t('checkpointsHint')),
                   h('div', { style: S.notifyRow },
                     h('span', { style: S.notifyLabel }, t('quietHours')),
                     h('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
@@ -3370,6 +3399,41 @@ window.__ModuleLoader__.load({
     // 面板挂载时注册的「选中某条待办」回调；面板没开时为 null，点通知只把窗口拉到前台。
     let SELECT_TODO = null
 
+    /** 通知里最多列几条检查点标题，多的用「…」收尾（和宿主端 renderMessage 同口径）。 */
+    const CHECKPOINT_TITLE_LIMIT = 5
+
+    /**
+     * 检查点时刻的输入解析：逗号 / 顿号 / 分号 / 空白分隔，只认 HH:mm，
+     * 非法项直接丢掉（不抛），去重后按时间升序 —— 和宿主端 normalizeCheckpoints 同一口径。
+     * 返回空数组表示「关掉检查点提醒」。
+     */
+    function parseCheckpoints(text) {
+      const seen = new Set()
+      for (const raw of asText(text).split(/[,，;；、\s]+/)) {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw)) continue
+        seen.add(raw)
+      }
+      return [...seen].sort((left, right) => minutesOfTime(left) - minutesOfTime(right))
+    }
+
+    /**
+     * 检查点的通知文案：标题与清单都用字典渲染（宿主只送结构化数据）。
+     * 不是检查点、或没有标题时返回 null，调用方回落到宿主给的 title / body。
+     */
+    function checkpointNotificationText(toast, t) {
+      if (toast === null || typeof toast !== 'object' || toast.kind !== 'checkpoint') return null
+      const titles = Array.isArray(toast.titles) ? toast.titles.map((item) => asText(item)).filter((item) => item !== '') : []
+      if (titles.length === 0) return null
+      const count = Number.isFinite(toast.count) ? toast.count : titles.length
+      const shown = titles.slice(0, CHECKPOINT_TITLE_LIMIT)
+      const rawSeparator = t('checkpointSeparator')
+      const separator = rawSeparator === 'checkpointSeparator' ? '、' : asText(rawSeparator)
+      return {
+        title: String(t('checkpointTitle')).replace('{count}', String(count)),
+        body: shown.join(separator === '' ? '、' : separator) + (titles.length > shown.length ? ' …' : ''),
+      }
+    }
+
     /**
      * 通知轮询必须活在插件层，不能放在 TodoPage 里：
      * 面板没打开时组件不挂载、轮询就不会跑 —— 而「没盯着待办面板」恰恰是最需要弹通知的时候。
@@ -3393,10 +3457,13 @@ window.__ModuleLoader__.load({
         try {
           const result = await fetchApi('notifyPoll', {}, getT())
           const toasts = Array.isArray(result?.toasts) ? result.toasts : []
+          const t = getT()
           for (const toast of toasts) {
             try {
-              const n = new Notification(toast.title || getT()('nav'), {
-                body: toast.body || '',
+              // 检查点用字典渲染标题与清单；其余通知沿用宿主给的措辞。
+              const summary = checkpointNotificationText(toast, t)
+              const n = new Notification((summary && summary.title) || toast.title || t('nav'), {
+                body: (summary && summary.body) || toast.body || '',
                 tag: 'dsh-quadrant-todolist:' + (toast.kind || 'due'),
                 renotify: true,
                 silent: ('dshDesktop' in globalThis),
@@ -3405,7 +3472,8 @@ window.__ModuleLoader__.load({
               n.onclick = () => {
                 LIVE_NOTIFICATIONS.delete(n)
                 try { window.focus() } catch (e) { /* focus 可能被浏览器策略拒绝 */ }
-                if (toast.id && typeof SELECT_TODO === 'function') SELECT_TODO(toast.id)
+                // 检查点是一条汇总，没有对应的单条待办；点它只把窗口拉到前台。
+                if (toast.kind !== 'checkpoint' && toast.id && typeof SELECT_TODO === 'function') SELECT_TODO(toast.id)
               }
               n.onclose = () => { LIVE_NOTIFICATIONS.delete(n) }
               n.onerror = () => { LIVE_NOTIFICATIONS.delete(n) }
@@ -3429,7 +3497,7 @@ window.__ModuleLoader__.load({
       const [dialog, setDialog] = useState(null)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
       const [calendarItems, setCalendarItems] = useState([])
-      const [settings, setSettings] = useState({ notify: { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, quietHours: { enabled: false, start: '22:00', end: '08:00' } } })
+      const [settings, setSettings] = useState({ notify: { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, checkpoints: ['11:00', '16:00'], quietHours: { enabled: false, start: '22:00', end: '08:00' } } })
       const [noticeHidden, setNoticeHidden] = useState(corruptDismissed)
       const [actionError, setActionError] = useState(false)
       const [dataVersion, setDataVersion] = useState(0)

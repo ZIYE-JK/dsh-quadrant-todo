@@ -121,18 +121,29 @@ test('a recurring task expands every occurrence with its block', async () => {
   }
 })
 
-test('a 时间段 fires 到期 at its END, not its start', async () => {
-  // 这条曾经断言反了：拿开始时间当截止，会让 09:30–10:00 在 09:30 就报「到期」。
+test('a 时间段 fires 到期 at its START (the reminder follows the start, not the end)', async () => {
+  // v5 起提醒点 = 开始时间：「09:30–10:00」在 09:30 提醒，不再等到 10:00。
   const item = { id: 't1', title: '排期任务', dueDate: '2026-11-03', startTime: '08:00', endTime: '18:00', bucket: 'today' }
   const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
-  assert.equal(collectDue([item], at(7, 59), NOTIFY).length, 0, 'nothing before the block')
-  assert.equal(collectDue([item], at(8, 0), NOTIFY).length, 0, 'starting the block is NOT 到期')
-  assert.equal(collectDue([item], at(12, 0), NOTIFY).length, 0, 'mid-block is NOT 到期')
-  assert.equal(collectDue([item], at(17, 59), NOTIFY).length, 0, 'one minute before the end is NOT 到期')
-  const fired = collectDue([item], at(18, 0), NOTIFY)
-  assert.equal(fired.length, 1, '到期 fires when the block ENDS')
+  assert.equal(collectDue([item], at(7, 59), NOTIFY).length, 0, 'nothing before the block starts')
+  const fired = collectDue([item], at(8, 0), NOTIFY)
+  assert.equal(fired.length, 1, 'fires the moment the block starts')
   assert.equal(fired[0].kind, 'due')
-  assert.equal(fired[0].dueTime, '18:00', 'and reports the real deadline')
+  assert.equal(fired[0].dueTime, '08:00', 'and reports the start, not the 18:00 end')
+  // collectDue 只负责「到点了就该产出」；同一分钟里的多次 tick 由通知账本去重。
+  assert.equal(collectDue([item], at(12, 0), NOTIFY)[0].kind, 'due', 'mid-block is still 到期, not 逾期')
+  assert.equal(collectDue([item], at(18, 0), NOTIFY)[0].dueTime, '08:00', 'the end is no longer the trigger')
+  assert.equal(collectDue([item], new Date(2026, 10, 4, 9, 0, 0), NOTIFY)[0].kind, 'overdue', '逾期从提醒点的第二天开始')
+})
+
+test('the reminder point is the start; an all-day row keeps the 09:00 fallback', () => {
+  const at = (h, m) => new Date(2026, 10, 3, h, m, 0)
+  const block = { id: 'b1', title: '写周报', dueDate: '2026-11-03', startTime: '09:30', endTime: '10:00', bucket: 'today' }
+  assert.equal(collectDue([block], at(9, 29), NOTIFY).length, 0)
+  assert.equal(collectDue([block], at(9, 30), NOTIFY)[0].dueTime, '09:30', '时间段按开始时间提醒')
+  const allDay = { id: 'b2', title: '全天任务', dueDate: '2026-11-03', startTime: null, endTime: null, bucket: 'today' }
+  assert.equal(collectDue([allDay], at(8, 59), NOTIFY).length, 0)
+  assert.equal(collectDue([allDay], at(9, 0), NOTIFY)[0].dueTime, '09:00', '全天保留默认的 09:00，不能默默不提醒')
 })
 
 test('a 时间点 fires 到期 at that point (point IS the deadline)', async () => {
@@ -146,6 +157,8 @@ test('a 时间点 fires 到期 at that point (point IS the deadline)', async () 
 
 test('REGRESSION: a 09:30-10:00 block created at 09:33 must not fire immediately', async () => {
   // 实际遇到的：建完 22 秒就弹「到期 · 截止 09:30」。
+  // v5 起提醒点就是开始时间 09:30；建单时它已经过去 → staleAtBirth 压掉当天，
+  // 第二天才作为逾期提醒一次，不会在创建后几秒补一条。
   const item = {
     id: 't3', title: '提供B2B数据图表-PPT用', dueDate: '2026-11-04',
     startTime: '09:30', endTime: '10:00', bucket: 'today',
@@ -153,11 +166,12 @@ test('REGRESSION: a 09:30-10:00 block created at 09:33 must not fire immediately
   }
   const at = (h, m) => new Date(2026, 10, 4, h, m, 0)
   assert.equal(collectDue([item], at(9, 33), NOTIFY).length, 0, 'not 22 seconds after creation')
-  assert.equal(collectDue([item], at(9, 40), NOTIFY).length, 0)
+  assert.equal(collectDue([item], at(9, 40), NOTIFY).length, 0, '开始时间在建单时就已过去')
   assert.equal(collectDue([item], at(9, 59), NOTIFY).length, 0)
-  const fired = collectDue([item], at(10, 0), NOTIFY)
-  assert.equal(fired.length, 1, 'fires at the real deadline')
-  assert.equal(fired[0].dueTime, '10:00', 'reports 10:00, not the 09:30 start')
+  assert.equal(collectDue([item], at(10, 0), NOTIFY).length, 0, '同一天内不再补发（staleAtBirth）')
+  const nextDay = collectDue([item], new Date(2026, 10, 5, 9, 0, 0), NOTIFY)
+  assert.equal(nextDay.length, 1, '第二天才是一次真正的逾期提醒')
+  assert.equal(nextDay[0].kind, 'overdue')
 })
 
 test('a same-day deadline already past at creation is not nagged on creation', async () => {
@@ -273,15 +287,16 @@ test('REGRESSION: 24:00 survives a reload', async () => {
   assert.equal(row.endTime, '24:00', 'still there after reload')
 })
 
-test('a block ending at 24:00 reports 到期 at midnight, not 逾期', async () => {
-  // 时限落在次日 0 点。若拿 dueDate 判「是不是过了那天」，跨过午夜的第一 tick
-  // 会直接进逾期分支，用户看到的是「逾期」而不是「到期」。
+test('a block ending at 24:00 reminds at its 23:00 start, not at midnight', async () => {
+  // 提醒点改成开始时间后，23:00–24:00 的提醒落在当天 23:00；
+  // 24:00 仍然只是「结束/时限」，不再决定提醒时刻。
   const item = { id: 'x', title: '深夜', dueDate: '2026-11-04', startTime: '23:00', endTime: '24:00', bucket: 'today' }
   const at = (d, h, m) => new Date(2026, 10, d, h, m, 0)
-  assert.equal(collectDue([item], at(4, 23, 30), NOTIFY).length, 0, 'nothing before the end')
-  const fired = collectDue([item], at(5, 0, 0), NOTIFY)
+  assert.equal(collectDue([item], at(4, 22, 59), NOTIFY).length, 0, 'nothing before the start')
+  const fired = collectDue([item], at(4, 23, 0), NOTIFY)
   assert.equal(fired.length, 1)
-  assert.equal(fired[0].kind, 'due', 'not overdue')
-  assert.equal(fired[0].dueTime, '24:00')
-  assert.equal(collectDue([item], at(6, 9, 0), NOTIFY)[0].kind, 'overdue', 'overdue the day after')
+  assert.equal(fired[0].kind, 'due', 'not overdue on its own day')
+  assert.equal(fired[0].dueTime, '23:00', 'the start is the reminder point')
+  assert.equal(collectDue([item], at(4, 23, 30), NOTIFY)[0].kind, 'due', 'still 到期 later that evening')
+  assert.equal(collectDue([item], at(5, 0, 0), NOTIFY)[0].kind, 'overdue', 'overdue the day after')
 })
