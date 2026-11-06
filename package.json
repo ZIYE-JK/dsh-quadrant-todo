@@ -1,10 +1,14 @@
 {
   "name": "dsh-quadrant-todolist",
   "version": "1.0.0",
-  "description": "DeepSeek Harness 侧栏待办（本地分支改造）：四象限矩阵 + 收集箱 + 子计划 + 月视图日历 + 循环任务 + 分类图标 + 系统通知 / 飞书通知，agent 可读写",
+  "description": "Four-quadrant todo manager for the DeepSeek Harness sidebar: month and week calendar views, per-period completion statistics, system and Feishu notifications, and recurrence rules including Chinese statutory workdays and the Ebbinghaus curve.",
   "type": "module",
   "license": "MIT",
   "author": "Natte",
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.2 || >=0.2.2-rc.1"
+  },
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -46,7 +50,7 @@
   "dshLocalFork": {
     "basedOn": "dsh-sidebar-todo@0.2.3",
     "upstream": "https://github.com/Natte/dsh-sidebar-todo",
-    "note": "本地分支改造，未发布；npm 原包保持不动，回退只需改回 profile 依赖。"
+    "note": "Derived from Natte/dsh-sidebar-todo 0.2.3 and largely rewritten. Do not install alongside the upstream package: both register the same /todo/api route and share the same todos.json data file."
   },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
