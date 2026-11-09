@@ -1086,6 +1086,34 @@ window.__ModuleLoader__.load({
       return asText(a.title).localeCompare(asText(b.title))
     }
 
+    /**
+     * 按天筛选矩阵 / 收集箱的行。
+     *
+     * 为什么不能直接比 `dueDate`：`list()` 对循环任务**只返回「今天之后的下一次」**，
+     * 拿它去比用户选的那一天永远对不上 —— 「每月 3 号」的任务于是只在系列起点那个月
+     * 出现在矩阵里，别的月份一片空白，而日历（走 occurrences）每天都有点。
+     *
+     * `dayOccurrence` 是宿主 occurrences 给的那一天的实例（Map<todoId, occurrence>）。
+     * 为 null 表示还没取到（或取失败），此时退回旧的 dueDate 比较：宁可少显示循环
+     * 任务，也不要因为一次网络抖动把整屏清空。
+     */
+    function filterRowsByDay(rows, dayFilter, dayOccurrence) {
+      if (dayFilter === null || dayFilter === undefined) return rows
+      if (!dayOccurrence) {
+        return rows.filter((item) => asText(item.dueDate) === dayFilter)
+      }
+      return rows.flatMap((item) => {
+        const occurrence = dayOccurrence.get(item.id)
+        // 实例的日期必须就是筛的那一天。正常情况必然相等（这份 map 就是按那一天取的），
+        // 但显式校验一下，调用方传错 map 时不会静默显示错日期的行。
+        if (!occurrence || asText(occurrence.date) !== dayFilter) return []
+        // 循环任务：换成那一天的实例，done / dueDate 都按那天算，
+        // 否则在矩阵里勾选会写到系列起点那天去。
+        if (!item.isRepeating) return [item]
+        return [{ ...item, dueDate: occurrence.date, nextDue: occurrence.date, done: occurrence.done === true }]
+      })
+    }
+
     function deadlineTitle(item, t) {
       const deadline = deadlineOf(item)
       if (deadline === null) return undefined
@@ -3506,6 +3534,12 @@ window.__ModuleLoader__.load({
       // 想回到全部，点左栏「全部」：onFilterChange 会把它清回 null。
       // handleSelectDay 是黏的：再点同一天不会取消（取消只有「全部」这一条路）。
       const [dayFilter, setDayFilter] = useState(() => dateKeyOf(new Date()))
+      // 选中某一天时，「那天有没有这条」必须按**当天实例**判断，不能拿 dueDate 比：
+      // list() 对循环任务只返回「今天之后的下一次」，拿它去比选中的日期永远对不上，
+      // 于是「每月3号」的任务只在系列起点那个月出现在矩阵里，别的月份一片空白。
+      // 这里用宿主权威的 occurrences 取那一天，Map<todoId, occurrence>。
+      // null = 还没拿到（此时退回旧的 dueDate 比较，避免数据闪没）。
+      const [dayOccurrence, setDayOccurrence] = useState(null)
       const [retrying, setRetrying] = useState(false)
 
       const tRef = useRef(t)
@@ -3629,6 +3663,27 @@ window.__ModuleLoader__.load({
           })
         return () => { alive = false }
       }, [monthCursor, dataVersion])
+
+      // 选中日那一天的实例（矩阵 / 收集箱按它筛，见 dayOccurrence 的注释）。
+      useEffect(() => {
+        if (dayFilter === null) { setDayOccurrence(null); return undefined }
+        let alive = true
+        fetchApi('occurrences', { from: dayFilter, to: dayFilter }, tRef.current)
+          .then((result) => {
+            if (!alive) return
+            const map = new Map()
+            for (const item of Array.isArray(result?.items) ? result.items : []) map.set(item.todoId, item)
+            setDayOccurrence(map)
+          })
+          .catch((err) => {
+            if (!alive) return
+            // 取不到就保持 null：退回旧的 dueDate 比较，宁可少显示循环任务，
+            // 也不要因为一次网络抖动把整屏清空。
+            console.error('[dsh-quadrant-todolist] day occurrences failed', err)
+            setDayOccurrence(null)
+          })
+        return () => { alive = false }
+      }, [dayFilter, dataVersion])
 
       const handleMonthChange = (delta) => {
         if (delta === 0) {
@@ -3761,18 +3816,17 @@ window.__ModuleLoader__.load({
       // 矩阵 = 已归入象限的计划（**含已完成**），再叠加可选的按天筛选。
       // 排序走全局统一的 compareTodoOrder：未完成在上、全天在前、有时间的按开始时间、
       // 其余按创建日期 —— 与月视图 / 周视图全天带 / 统计清单同一套口径。
+      // 按天筛选的坑见 filterRowsByDay 的注释。
       const quadrantItems = useMemo(() => {
-        let rows = items.filter((item) => Boolean(item.quadrant))
-        if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
-        return rows.sort(compareTodoOrder)
-      }, [items, dayFilter])
+        const rows = filterRowsByDay(items.filter((item) => Boolean(item.quadrant)), dayFilter, dayOccurrence)
+        return rows.slice().sort(compareTodoOrder)
+      }, [items, dayFilter, dayOccurrence])
 
       // 收集箱 = 还没有象限的任务。矩阵按象限分组，它们在那里无处可去。
       const inboxItems = useMemo(() => {
-        let rows = items.filter((item) => !item.quadrant)
-        if (dayFilter !== null) rows = rows.filter((item) => asText(item.dueDate) === dayFilter)
-        return rows.sort(compareTodoOrder)
-      }, [items, dayFilter])
+        const rows = filterRowsByDay(items.filter((item) => !item.quadrant), dayFilter, dayOccurrence)
+        return rows.slice().sort(compareTodoOrder)
+      }, [items, dayFilter, dayOccurrence])
 
       const handleSelect = (id) => {
         setSelected(id)
