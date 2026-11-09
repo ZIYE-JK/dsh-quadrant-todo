@@ -1740,11 +1740,14 @@ window.__ModuleLoader__.load({
                 })))))
     }
 
-    function CalendarView({ t, selectedDay, onPickDay, version, onSelect, selectedId }) {
-      const [cursor, setCursor] = useState(() => {
+    function CalendarView({ t, selectedDay, onPickDay, version, onSelect, selectedId, monthCursor, onMonthChange }) {
+      // 月份状态**由父组件持有**，主月视图不再自己存一份。以前两边各存一份
+      // （主视图 cursor / 左栏 monthCursor），翻主视图时左栏迷你日历纹丝不动，
+      // 于是「左边有红点、右边没任务」这种看起来像 bug 的现象其实是两个月份。
+      const cursor = monthCursor ?? (() => {
         const at = new Date()
         return { year: at.getFullYear(), month: at.getMonth() }
-      })
+      })()
       const [byDate, setByDate] = useState({})
 
       const cells = monthGrid(cursor.year, cursor.month)
@@ -1777,13 +1780,11 @@ window.__ModuleLoader__.load({
       }, [from, to, version])
 
       const move = (delta) => {
-        const at = new Date(cursor.year, cursor.month + delta, 1)
-        setCursor({ year: at.getFullYear(), month: at.getMonth() })
+        onMonthChange?.(delta)
       }
 
       const goToday = () => {
-        const at = new Date()
-        setCursor({ year: at.getFullYear(), month: at.getMonth() })
+        onMonthChange?.(0)
       }
 
       return h('div', { style: S.calendarView },
@@ -3796,6 +3797,10 @@ window.__ModuleLoader__.load({
             onSelect: handleSelect,
             selectedId: selected,
             version: dataVersion,
+            // 与左栏迷你日历共用同一个月份状态：翻这儿的 ‹ › 或按「今天」，
+            // 左栏会跟着变，两处永远不会指向不同的月份。
+            monthCursor,
+            onMonthChange: handleMonthChange,
           })
         }
         // 专注 = 周视图（7 天 × 0-24 时段）
