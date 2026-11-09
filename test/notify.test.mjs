@@ -142,7 +142,8 @@ test('poll returns queued toasts, clears them, and drops stale ones', async () =
 
   const first = notifier.poll(at(2026, 11, 3, 11, 1))
   assert.equal(first.toasts.length, 1)
-  assert.equal(first.toasts[0].title, '🔔 待办到期')
+  // 措辞有意从「待办到期」改成「待办开始」：提醒点现在是开始时刻，不是截止。
+  assert.equal(first.toasts[0].title, '🔔 待办开始')
   assert.match(first.toasts[0].body, /交周报/)
   assert.equal(first.toasts[0].kind, 'due')
   assert.deepEqual(notifier.poll(at(2026, 11, 3, 11, 2)).toasts, [], 'queue drained')
@@ -224,4 +225,29 @@ test('ledger survives a restart via notify-state.json', async () => {
   await n2._loadLedger()
   assert.equal(n2.ledgerSize(), 1, 'dedupe state reloaded')
   assert.equal((await n2._tick(at(2026, 11, 3, 11, 5))).fired, 0, 'no re-fire after restart')
+
+test('the message says "starting in N minutes", never "due at"', async () => {
+  // 真实踩到过：leadMinutes=5、待办 10:00 开始，09:55 弹出「待办到期 截止 10:00」，
+  // 用户以为是发早了。提醒点是开始时刻，提前量必须写进文案。
+  const item = { id: 't1', title: 'Performance制表', dueDate: '2026-11-09', startTime: '10:00', endTime: '16:00', bucket: 'today' }
+  const N = { system: true, feishu: false, leadMinutes: 5, overdueDaily: true, checkpoints: [], quietHours: { enabled: false, start: '22:00', end: '08:00' } }
+  assert.equal(collectDue([item], at(2026, 11, 9, 9, 54), N).length, 0, 'silent a minute early')
+  const [ev] = collectDue([item], at(2026, 11, 9, 9, 55), N)
+  const msg = renderMessage(ev)
+  assert.equal(msg.title, '🔔 待办即将开始')
+  assert.match(msg.body, /5 分钟后开始/)
+  assert.match(msg.body, /10:00/)
+  assert.doesNotMatch(msg.title, /到期/)
+  assert.doesNotMatch(msg.body, /截止/)
+})
+
+test('an all-day row is announced as 全天, not as a 09:00 start', async () => {
+  const item = { id: 't2', title: '看报表', dueDate: '2026-11-09', startTime: null, endTime: null, bucket: 'today' }
+  const N = { system: true, feishu: false, leadMinutes: 5, overdueDaily: true, checkpoints: [], quietHours: { enabled: false, start: '22:00', end: '08:00' } }
+  const [ev] = collectDue([item], at(2026, 11, 9, 9, 0), N)
+  const msg = renderMessage(ev)
+  assert.equal(msg.title, '🔔 待办提醒')
+  assert.match(msg.body, /全天/)
+  assert.doesNotMatch(msg.body, /09:00/, 'the 09:00 sentinel must not leak into the text')
+})
 })
