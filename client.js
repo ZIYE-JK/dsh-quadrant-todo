@@ -1,11 +1,11 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-quadrant-todolist',
+  id: 'dsh-quadrant-todo',
   factory(require) {
     const React = require('react')
     const h = React.createElement
     const { useState, useEffect, useCallback, useRef, useMemo } = React
 
-    const NS = 'dsh-quadrant-todolist'
+    const NS = 'dsh-quadrant-todo'
     const dict = {
       zh: {
         nav: '待办', title: '待办', new: '新建', search: '搜索待办',
@@ -684,10 +684,10 @@ window.__ModuleLoader__.load({
 `
 
     function ensureStyles() {
-      const existing = document.querySelector('style[data-plugin-css="dsh-quadrant-todolist"]')
+      const existing = document.querySelector('style[data-plugin-css="dsh-quadrant-todo"]')
       if (existing !== null) return () => {}
       const el = document.createElement('style')
-      el.dataset.pluginCss = 'dsh-quadrant-todolist'
+      el.dataset.pluginCss = 'dsh-quadrant-todo'
       el.textContent = PLUGIN_CSS
       document.head.appendChild(el)
       return () => { el.remove() }
@@ -1856,7 +1856,7 @@ window.__ModuleLoader__.load({
           })
           .catch((err) => {
             if (!alive) return
-            console.error('[dsh-quadrant-todolist] occurrences failed', err)
+            console.error('[dsh-quadrant-todo] occurrences failed', err)
             setByDate({})
           })
         return () => { alive = false }
@@ -1986,7 +1986,7 @@ window.__ModuleLoader__.load({
           })
           .catch((err) => {
             if (!alive) return
-            console.error('[dsh-quadrant-todolist] week occurrences failed', err)
+            console.error('[dsh-quadrant-todo] week occurrences failed', err)
             setItems([])
           })
         return () => { alive = false }
@@ -2113,7 +2113,7 @@ window.__ModuleLoader__.load({
         frozenRef.current.delete(drag.id)
         setFrozenTimes(new Map(frozenRef.current))
         Promise.resolve(onReschedule(drag.item, drag.preview)).catch((err) => {
-          console.error('[dsh-quadrant-todolist] reschedule failed', err)
+          console.error('[dsh-quadrant-todo] reschedule failed', err)
         })
       }
 
@@ -2151,7 +2151,7 @@ window.__ModuleLoader__.load({
         const next = rescheduleTimes(item, event.shiftKey ? 'resize' : 'move', step)
         if (next === null) return
         Promise.resolve(onReschedule(item, next)).catch((err) => {
-          console.error('[dsh-quadrant-todolist] reschedule failed', err)
+          console.error('[dsh-quadrant-todo] reschedule failed', err)
         })
       }
 
@@ -3575,7 +3575,7 @@ window.__ModuleLoader__.load({
               const summary = checkpointNotificationText(toast, t)
               const n = new Notification((summary && summary.title) || toast.title || t('nav'), {
                 body: (summary && summary.body) || toast.body || '',
-                tag: 'dsh-quadrant-todolist:' + (toast.kind || 'due'),
+                tag: 'dsh-quadrant-todo:' + (toast.kind || 'due'),
                 renotify: true,
                 silent: ('dshDesktop' in globalThis),
               })
@@ -3589,11 +3589,11 @@ window.__ModuleLoader__.load({
               n.onclose = () => { LIVE_NOTIFICATIONS.delete(n) }
               n.onerror = () => { LIVE_NOTIFICATIONS.delete(n) }
             } catch (e) {
-              console.error('[dsh-quadrant-todolist] notification failed', e)
+              console.error('[dsh-quadrant-todo] notification failed', e)
             }
           }
         } catch (err) {
-          console.error('[dsh-quadrant-todolist] notifyPoll failed', err)
+          console.error('[dsh-quadrant-todo] notifyPoll failed', err)
         }
       }, 3000)
       return () => window.clearInterval(timer)
@@ -3671,7 +3671,7 @@ window.__ModuleLoader__.load({
           })
         } catch (err) {
           if (seq !== seqRef.current || !aliveRef.current) return
-          console.error('[dsh-quadrant-todolist] list failed', err)
+          console.error('[dsh-quadrant-todo] list failed', err)
           setState((prev) => ({ ...prev, loading: false, error: true }))
         }
       }, [])
@@ -3684,7 +3684,7 @@ window.__ModuleLoader__.load({
           await reload()
           return true
         } catch (err) {
-          console.error(`[dsh-quadrant-todolist] ${method} failed`, err)
+          console.error(`[dsh-quadrant-todo] ${method} failed`, err)
           // 新建分类要把宿主的具体原因（「分类名必填」/「分类名过长（上限 24 字）」）
           // 显示在输入行上，所以允许调用方选择把错误原样抛回；其余调用维持通用错误条。
           if (options?.rethrow === true) throw err
@@ -3712,7 +3712,7 @@ window.__ModuleLoader__.load({
             if (!aliveRef.current) return
             if (result?.notify) setSettings({ notify: result.notify })
           })
-          .catch((err) => console.error('[dsh-quadrant-todolist] settings failed', err))
+          .catch((err) => console.error('[dsh-quadrant-todo] settings failed', err))
       }, [])
 
       useEffect(() => { void reload() }, [reload])
@@ -3742,7 +3742,7 @@ window.__ModuleLoader__.load({
           })
           .catch((err) => {
             if (!alive) return
-            console.error('[dsh-quadrant-todolist] occurrences failed', err)
+            console.error('[dsh-quadrant-todo] occurrences failed', err)
             setCalendarItems([])
           })
         return () => { alive = false }
@@ -3772,7 +3772,7 @@ window.__ModuleLoader__.load({
             if (!alive) return
             // 取不到就保持 null：退回按 dueDate 落在窗口内，宁可少显示循环任务，
             // 也不要因为一次网络抖动把整屏清空。
-            console.error('[dsh-quadrant-todolist] window occurrences failed', err)
+            console.error('[dsh-quadrant-todo] window occurrences failed', err)
             setWindowOccurrence(null)
           })
         return () => { alive = false }
@@ -3805,7 +3805,7 @@ window.__ModuleLoader__.load({
           }
           await mutate('create', payload)
         } catch (err) {
-          console.error('[dsh-quadrant-todolist] quick add failed', err)
+          console.error('[dsh-quadrant-todo] quick add failed', err)
           await mutate('create', { title: text, quadrant: null })
         }
       }, [mutate])
@@ -3874,7 +3874,7 @@ window.__ModuleLoader__.load({
           await fetchApi('retry', {}, tRef.current)
           await reload()
         } catch (err) {
-          console.error('[dsh-quadrant-todolist] retry write failed', err)
+          console.error('[dsh-quadrant-todo] retry write failed', err)
         } finally {
           if (aliveRef.current) setRetrying(false)
         }
@@ -4195,7 +4195,7 @@ window.__ModuleLoader__.load({
             if (cancelled || !alive.current) return
             setCategoryRows(normalizeCategories(result))
           })
-          .catch((err) => console.error('[dsh-quadrant-todolist] categories failed', err))
+          .catch((err) => console.error('[dsh-quadrant-todo] categories failed', err))
         return () => { cancelled = true }
       }, [])
 
@@ -4479,12 +4479,12 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
-        ctx.effect(() => ensureStyles(), 'dsh-quadrant-todolist: styles')
+        ctx.effect(() => ensureStyles(), 'dsh-quadrant-todo: styles')
 
         const locale = ctx.get('locale')
         let t = (key) => dict.zh[key] ?? key
         if (locale) {
-          ctx.effect(() => locale.register(NS, dict), 'dsh-quadrant-todolist: dictionaries')
+          ctx.effect(() => locale.register(NS, dict), 'dsh-quadrant-todo: dictionaries')
           t = locale.bind(NS)
         }
 
@@ -4498,7 +4498,7 @@ window.__ModuleLoader__.load({
         }, TodoPage))
 
         // 通知轮询挂在插件层：面板开着才轮询，等于「盯着看的时候才有提醒」。
-        ctx.effect(() => startNotificationWatch(() => t), 'dsh-quadrant-todolist: notify-watch')
+        ctx.effect(() => startNotificationWatch(() => t), 'dsh-quadrant-todo: notify-watch')
       },
     }
   },

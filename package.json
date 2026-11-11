@@ -1,6 +1,6 @@
 {
-  "name": "dsh-quadrant-todolist",
-  "version": "1.1.0",
+  "name": "dsh-quadrant-todo",
+  "version": "1.2.0",
   "description": "Four-quadrant todo manager for the DeepSeek Harness sidebar: month and week calendar views, per-period completion statistics, system and Feishu notifications, and recurrence rules including Chinese statutory workdays and the Ebbinghaus curve.",
   "type": "module",
   "license": "MIT",
@@ -27,11 +27,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ZIYE-JK/dsh-quadrant-todolist.git"
+    "url": "git+https://github.com/ZIYE-JK/dsh-quadrant-todo.git"
   },
-  "homepage": "https://github.com/ZIYE-JK/dsh-quadrant-todolist#readme",
+  "homepage": "https://github.com/ZIYE-JK/dsh-quadrant-todo#readme",
   "bugs": {
-    "url": "https://github.com/ZIYE-JK/dsh-quadrant-todolist/issues"
+    "url": "https://github.com/ZIYE-JK/dsh-quadrant-todo/issues"
   },
   "exports": {
     ".": "./index.js",
@@ -48,15 +48,28 @@
     "icon.svg",
     "docs/**/*.md"
   ],
-  "scripts": { "test": "node --test" },
-  "publishConfig": { "access": "public" },
+  "scripts": {
+    "test": "node --test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dshLocalFork": {
     "basedOn": "dsh-sidebar-todo@0.2.3",
     "upstream": "https://github.com/Natte/dsh-sidebar-todo",
     "note": "Derived from Natte/dsh-sidebar-todo 0.2.3 and largely rewritten. Do not install alongside the upstream package: both register the same /todo/api route and share the same todos.json data file."
   },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
-    "client": { "platform": "web", "immediately": true, "inject": ["@deepseek-ai/dsh-client-ui-sidebar", "@deepseek-ai/dsh-client-locale"] }
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
   }
 }

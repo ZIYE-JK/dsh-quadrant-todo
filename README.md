@@ -1,9 +1,9 @@
-# dsh-quadrant-todolist
+# dsh-quadrant-todo
 
 DeepSeek Harness 的侧栏待办插件：管理日常工作的清单，数据和 agent 共用一份。
 
-> 仓库、npm 包与插件标识统一为 `dsh-quadrant-todolist`；DSH 侧栏显示的名字是「待办」。
-> 尚未发布到 npm；仓库地址 https://github.com/ZIYE-JK/dsh-quadrant-todolist
+> 仓库、npm 包与插件标识统一为 `dsh-quadrant-todo`；DSH 侧栏显示的名字是「待办」。
+> 尚未发布到 npm；仓库地址 https://github.com/ZIYE-JK/dsh-quadrant-todo
 
 当前版本 **1.1.0**（四象限矩阵、周/月视图、统计、按开始时刻的系统与飞书通知 + 每日检查点、法定工作日与艾宾浩斯重复）。
 
@@ -58,18 +58,18 @@ DeepSeek Harness 的侧栏待办插件：管理日常工作的清单，数据和
 
 **从 npm**
 
-> ⚠️ 尚未发布到 npm。包名已定为 `dsh-quadrant-todolist`，发布前请走下面的 GitHub 方式。
+> ⚠️ 尚未发布到 npm。包名已定为 `dsh-quadrant-todo`，发布前请走下面的 GitHub 方式。
 
 ```bash
-dsh plugin --profile web add dsh-quadrant-todolist
+dsh plugin --profile web add dsh-quadrant-todo
 ```
 
-装完在侧栏「自动化任务」下方出现「待办」。也可以在宿主的 **插件 → 发现** 里搜 `dsh-quadrant-todolist`（或「待办」），在市场里一键安装。
+装完在侧栏「自动化任务」下方出现「待办」。也可以在宿主的 **插件 → 发现** 里搜 `dsh-quadrant-todo`（或「待办」），在市场里一键安装。
 
 **从 GitHub 源码（当前推荐）**
 
 ```bash
-dsh plugin --profile web add github:ZIYE-JK/dsh-quadrant-todolist
+dsh plugin --profile web add github:ZIYE-JK/dsh-quadrant-todo
 ```
 
 适合想跟最新提交、或 npm 还没发到新版本时用；更新按 commit 追，没有版本号。
@@ -99,7 +99,7 @@ plugin_manager install_bundle  target: <本仓库目录>
 在 `cordis.patch.yml` 的插件行里改：
 
 ```yaml
-- id: dsh-quadrant-todolist
+- id: dsh-quadrant-todo
   config:
     staleDays: 7   # 超过多少天还没定日期算「积压」
     dataPath: ''   # 可选，覆盖默认数据文件路径

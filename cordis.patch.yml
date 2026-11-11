@@ -1,5 +1,5 @@
 - insert:
-    - id: dsh-quadrant-todolist
-      name: dsh-quadrant-todolist
+    - id: dsh-quadrant-todo
+      name: dsh-quadrant-todo
       config:
         staleDays: 7

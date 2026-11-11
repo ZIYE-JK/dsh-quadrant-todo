@@ -73,7 +73,7 @@ export function apply(ctx, config = {}) {
   void ready.then((res) => {
     if (res && res.migrated) {
       console.info(
-        `[dsh-quadrant-todolist] 数据已从 v${res.migrated.from} 迁移到 v${res.migrated.to}` +
+        `[dsh-quadrant-todo] 数据已从 v${res.migrated.from} 迁移到 v${res.migrated.to}` +
         `（${res.migrated.movedQuadrants} 条待办的象限名从「分类」搬到了「四象限」）；` +
         `原文件已备份为 todos.v1-backup-*.json`,
       )
@@ -111,15 +111,15 @@ export function apply(ctx, config = {}) {
         })
       }
     },
-  }), 'dsh-quadrant-todolist: http')
+  }), 'dsh-quadrant-todo: http')
 
-  ctx.effect(() => ctx.tools.register(createTool(api, ready)), 'dsh-quadrant-todolist: tool')
+  ctx.effect(() => ctx.tools.register(createTool(api, ready)), 'dsh-quadrant-todo: tool')
 
   ctx.effect(() => {
     // 巡检必须等数据加载完，否则第一 tick 会看到空清单。
     void ready.then(() => notifier.start()).catch(() => {})
     return () => notifier.stop()
-  }, 'dsh-quadrant-todolist: notify')
+  }, 'dsh-quadrant-todo: notify')
 
   ctx.effect(() => {
     const cycle = async () => {
@@ -130,7 +130,7 @@ export function apply(ctx, config = {}) {
         await holidays.ensure()
         setWorkdayTables(holidays.tables())
       } catch (err) {
-        console.warn('[dsh-quadrant-todolist] 法定工作日更新失败（继续用已有数据）：', err?.message ?? err)
+        console.warn('[dsh-quadrant-todo] 法定工作日更新失败（继续用已有数据）：', err?.message ?? err)
       }
     }
     void cycle()
@@ -138,7 +138,7 @@ export function apply(ctx, config = {}) {
     const timer = setInterval(cycle, 3600000)
     if (typeof timer.unref === 'function') timer.unref()
     return () => clearInterval(timer)
-  }, 'dsh-quadrant-todolist: workdays')
+  }, 'dsh-quadrant-todo: workdays')
 
-  ctx.effect(() => () => { void store.close() }, 'dsh-quadrant-todolist: store')
+  ctx.effect(() => () => { void store.close() }, 'dsh-quadrant-todo: store')
 }
