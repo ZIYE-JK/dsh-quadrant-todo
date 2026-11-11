@@ -50,6 +50,8 @@ window.__ModuleLoader__.load({
         plan: '做计划', view: '月视图', focus: '周视图',
         inbox: '收集箱', inboxPlaceholder: '添加计划到「收集箱」，回车即可保存',
         all: '全部', uncategorized: '无分类', newCategory: '新建分类',
+        allCategories: '全部分类', statusAll: '全部', statusDone: '已完成', statusTodo: '待办',
+        rangeMonth: '当月', rangeYear: '当年',
         monthTitle: '{year}年{month}月', backToToday: '回到今天',
         quadrantUrgentImportant: '重要且紧急',
         quadrantUrgentNotImportant: '紧急不重要',
@@ -150,6 +152,8 @@ window.__ModuleLoader__.load({
         plan: 'Plan', view: 'Month view', focus: 'Week view',
         inbox: 'Inbox', inboxPlaceholder: 'Add to Inbox, press Enter to save',
         all: 'All', uncategorized: 'No category', newCategory: 'New category',
+        allCategories: 'All categories', statusAll: 'All', statusDone: 'Done', statusTodo: 'To do',
+        rangeMonth: 'Month', rangeYear: 'Year',
         monthTitle: '{year} {{month}}', backToToday: 'Back to today',
         quadrantUrgentImportant: 'Urgent & Important',
         quadrantUrgentNotImportant: 'Urgent & Not Important',
@@ -335,6 +339,12 @@ window.__ModuleLoader__.load({
       categoryIcon: { flex: 'none', width: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' },
       categoryName: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       categoryCount: { flex: 'none', fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
+      // 左栏两排筛选按钮（状态 / 窗口）。做成等宽分段控件，选中态用实底，
+      // 和下面的分类行区分开——它们管的是口径，不是分类。
+      segBlock: { padding: '4px 12px 0' },
+      segRow: { display: 'flex', gap: 4, marginBottom: 4 },
+      segBtn: { flex: 1, minWidth: 0, height: 26, padding: '0 4px', border: '0.5px solid var(--dsw-alias-border-l2)', borderRadius: 6, background: 'transparent', color: 'var(--dsw-alias-label-secondary)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      segBtnActive: { background: 'var(--dsw-alias-interactive-bg-hover)', borderColor: 'var(--dsw-alias-label-tertiary)', color: 'var(--dsw-alias-label-primary)', fontWeight: 600 },
       newCategoryBtn: { display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', margin: '8px 12px', borderRadius: 6, border: '0.5px dashed var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', justifyContent: 'center' },
       // 「+ 新建分类」就地展开的一行输入：不再走旧的「管理分类」弹窗。
       newCategoryBox: { display: 'flex', flexDirection: 'column', gap: 4, margin: '0 12px 8px' },
@@ -1087,31 +1097,76 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 按天筛选矩阵 / 收集箱的行。
-     *
-     * 为什么不能直接比 `dueDate`：`list()` 对循环任务**只返回「今天之后的下一次」**，
-     * 拿它去比用户选的那一天永远对不上 —— 「每月 3 号」的任务于是只在系列起点那个月
-     * 出现在矩阵里，别的月份一片空白，而日历（走 occurrences）每天都有点。
-     *
-     * `dayOccurrence` 是宿主 occurrences 给的那一天的实例（Map<todoId, occurrence>）。
-     * 为 null 表示还没取到（或取失败），此时退回旧的 dueDate 比较：宁可少显示循环
-     * 任务，也不要因为一次网络抖动把整屏清空。
+     * 时间窗口。左栏两个按钮只给「粒度」，具体年月跟迷你日历走：
+     *   当天 → 选中的那天（没选就今天）
+     *   当月 → 迷你日历所在月
+     *   当年 → 迷你日历所在年
+     * 三处（数字、矩阵、收集箱）都从这一个函数拿范围，保证口径只有一个。
      */
-    function filterRowsByDay(rows, dayFilter, dayOccurrence) {
-      if (dayFilter === null || dayFilter === undefined) return rows
-      if (!dayOccurrence) {
-        return rows.filter((item) => asText(item.dueDate) === dayFilter)
+    function windowRangeOf(rangeMode, dayFilter, monthCursor) {
+      if (rangeMode === 'year' || rangeMode === 'month') {
+        const at = monthCursor ?? (() => {
+          const now = new Date()
+          return { year: now.getFullYear(), month: now.getMonth() }
+        })()
+        if (rangeMode === 'year') {
+          return { from: `${at.year}-01-01`, to: `${at.year}-12-31` }
+        }
+        const month = String(at.month + 1).padStart(2, '0')
+        const lastDay = new Date(at.year, at.month + 1, 0).getDate()
+        return { from: `${at.year}-${month}-01`, to: `${at.year}-${month}-${String(lastDay).padStart(2, '0')}` }
       }
-      return rows.flatMap((item) => {
-        const occurrence = dayOccurrence.get(item.id)
-        // 实例的日期必须就是筛的那一天。正常情况必然相等（这份 map 就是按那一天取的），
-        // 但显式校验一下，调用方传错 map 时不会静默显示错日期的行。
-        if (!occurrence || asText(occurrence.date) !== dayFilter) return []
-        // 循环任务：换成那一天的实例，done / dueDate 都按那天算，
-        // 否则在矩阵里勾选会写到系列起点那天去。
-        if (!item.isRepeating) return [item]
-        return [{ ...item, dueDate: occurrence.date, nextDue: occurrence.date, done: occurrence.done === true }]
-      })
+      const day = asText(dayFilter) || dateKeyOf(new Date())
+      return { from: day, to: day }
+    }
+
+    /**
+     * 把 list() 的行展开成窗口内的「实例行」。
+     *
+     * 为什么不用 dueDate 直接比：list() 对循环任务只返回「今天之后的下一次」，
+     * 拿它比窗口里的日期永远对不上（这正是「每月3号只在创建那个月出现」的根因）。
+     * 展开后同一任务在窗口内出现几次就是几行，于是**数字和列表条数恒等**。
+     *
+     * occurrences 为 null 表示还没取到（或取失败）：退回按 dueDate 落在窗口内，
+     * 宁可少显示循环任务，也不要因为一次抖动把整屏清空。
+     */
+    function expandRowsForWindow(rows, range, occurrences) {
+      if (!range) return rows
+      if (!occurrences) {
+        return rows.filter((item) => {
+          const at = asText(item.dueDate)
+          return at !== '' && at >= range.from && at <= range.to
+        })
+      }
+      const out = []
+      for (const item of rows) {
+        const byDate = occurrences.get(item.id)
+        if (!byDate) continue
+        for (const [date, done] of byDate) {
+          if (date < range.from || date > range.to) continue
+          // dueDate / done 都按那一天算，否则在矩阵里勾选会写到系列起点那天去。
+          out.push({ ...item, dueDate: date, nextDue: date, done: done === true })
+        }
+      }
+      out.sort((a, b) => asText(a.dueDate).localeCompare(asText(b.dueDate)))
+      return out
+    }
+
+    /** 完成状态筛选：全部 / 已完成 / 待办。 */
+    function matchesStatus(row, statusFilter) {
+      if (statusFilter === 'done') return row.done === true
+      if (statusFilter === 'todo') return row.done !== true
+      return true
+    }
+
+    /** 按分类聚合实例数（key 为空串表示无分类）。数字和列表来自同一份行，天然一致。 */
+    function countRowsByCategory(rows) {
+      const counts = new Map()
+      for (const row of rows) {
+        const key = asText(row.category)
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      return counts
     }
 
     function deadlineTitle(item, t) {
@@ -2476,7 +2531,7 @@ window.__ModuleLoader__.load({
               : null)))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, uncategorizedCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay, statusFilter, onStatusChange, rangeMode, onRangeChange }) {
       // 「+ 新建分类」就地展开一行输入：不再打开旧的「管理分类」弹窗。
       const [creating, setCreating] = useState(false)
       const [draft, setDraft] = useState('')
@@ -2594,20 +2649,47 @@ window.__ModuleLoader__.load({
               dotColor ? h('span', { style: { ...S.calendarDot, background: dotColor }, 'aria-hidden': 'true' }) : null)
             }))),
 
+        // 两排筛选按钮：上面管「完成状态」，下面管「时间窗口」。
+        // 它们只决定口径，不是分类——所以和下面的分类行分开摆。
+        h('div', { style: S.segBlock },
+          h('div', { style: S.segRow },
+            [['all', 'statusAll'], ['done', 'statusDone'], ['todo', 'statusTodo']].map(([value, label]) =>
+              h('button', {
+                key: value,
+                type: 'button',
+                className: 'td-btn',
+                style: { ...S.segBtn, ...(statusFilter === value ? S.segBtnActive : null) },
+                'aria-pressed': statusFilter === value ? 'true' : 'false',
+                onClick: () => onStatusChange(value),
+              }, t(label)))),
+          h('div', { style: S.segRow },
+            [['month', 'rangeMonth'], ['year', 'rangeYear']].map(([value, label]) =>
+              h('button', {
+                key: value,
+                type: 'button',
+                className: 'td-btn',
+                style: { ...S.segBtn, ...(rangeMode === value ? S.segBtnActive : null) },
+                'aria-pressed': rangeMode === value ? 'true' : 'false',
+                onClick: () => onRangeChange(value),
+              }, t(label))))),
+
         // Category list
         h('div', { style: S.categoryList },
+          // 「全部分类」：上面那三个按钮里也有个「全部」，但那是**状态**。
+          // 这里必须有自己的一条，否则点进某个分类就回不到「所有分类」了。
           h('div', {
             style: { ...S.categoryRow, ...(activeFilter === 'all' ? S.categoryRowSelected : null) },
             onClick: () => onFilterChange('all'),
           },
           h('span', { style: S.categoryIcon }, h(Icon, { name: 'circle', size: 16 })),
-          h('span', { style: S.categoryName }, t('all'))),
+          h('span', { style: S.categoryName }, t('allCategories'))),
           h('div', {
             style: { ...S.categoryRow, ...(activeFilter === '__none__' ? S.categoryRowSelected : null) },
             onClick: () => onFilterChange('__none__'),
           },
           h('span', { style: S.categoryIcon }, h(Icon, { name: 'slashCircle', size: 16 })),
-          h('span', { style: S.categoryName }, t('uncategorized'))),
+          h('span', { style: S.categoryName }, t('uncategorized')),
+          h('span', { style: S.categoryCount }, String(uncategorizedCount ?? 0))),
           categories.map((cat) => h('div', {
             key: cat.name,
             style: { ...S.categoryRow, ...(activeFilter === cat.name ? S.categoryRowSelected : null) },
@@ -3530,16 +3612,20 @@ window.__ModuleLoader__.load({
       const [noticeHidden, setNoticeHidden] = useState(corruptDismissed)
       const [actionError, setActionError] = useState(false)
       const [dataVersion, setDataVersion] = useState(0)
-      // 左栏选中的具体某一天；**打开时默认就是「今天」** —— null 才表示不筛日期。
-      // 想回到全部，点左栏「全部」：onFilterChange 会把它清回 null。
-      // handleSelectDay 是黏的：再点同一天不会取消（取消只有「全部」这一条路）。
+      // 左栏「窗口」的粒度：当天 / 当月 / 当年。默认当天（打开就看今天该做什么）。
+      // 具体是哪一天由 dayFilter 给，哪一月/哪一年由 monthCursor（迷你日历）给；
+      // 点日历选了某天就回到 'day'，点「当月/当年」则清掉 dayFilter。
+      const [rangeMode, setRangeMode] = useState('day')
+      // 完成状态筛选。默认「全部」——**数字和列表同口径**，不搞「数字按待办、
+      // 列表不过滤」那种两套账，否则数字和点进去看到的条数对不上。
+      const [statusFilter, setStatusFilter] = useState('all')
+      // 左栏选中的具体某一天；**打开时默认就是「今天」** —— null 才表示没选日期。
+      // 点某个分类标签**不会**清掉它：分类和窗口是正交的两个维度。
       const [dayFilter, setDayFilter] = useState(() => dateKeyOf(new Date()))
-      // 选中某一天时，「那天有没有这条」必须按**当天实例**判断，不能拿 dueDate 比：
-      // list() 对循环任务只返回「今天之后的下一次」，拿它去比选中的日期永远对不上，
-      // 于是「每月3号」的任务只在系列起点那个月出现在矩阵里，别的月份一片空白。
-      // 这里用宿主权威的 occurrences 取那一天，Map<todoId, occurrence>。
-      // null = 还没拿到（此时退回旧的 dueDate 比较，避免数据闪没）。
-      const [dayOccurrence, setDayOccurrence] = useState(null)
+      // 窗口内的实例：Map<todoId, Map<date, done>>。数字、矩阵、收集箱都从它展开，
+      // 所以同一份数据既算数字也出列表，条数天然恒等。
+      // null = 还没拿到（此时退回按 dueDate 落在窗口内，避免数据闪没）。
+      const [windowOccurrence, setWindowOccurrence] = useState(null)
       const [retrying, setRetrying] = useState(false)
 
       const tRef = useRef(t)
@@ -3566,12 +3652,10 @@ window.__ModuleLoader__.load({
       const reload = useCallback(async () => {
         const seq = ++seqRef.current
         try {
-          const params = {}
-          if (activeFilter === '__inbox__') params.quadrant = '__inbox__'
-          else if (activeFilter === '__none__') params.category = '__none__'
-          else if (activeFilter !== 'all') params.category = activeFilter
+          // **不带分类/象限参数**：分类筛选改在客户端做，因为左栏要给「每个分类」
+          // 都算出窗口内的条数——服务端一旦按分类筛过，就只剩一个分类的数据了。
           const [result, catResult] = await Promise.all([
-            fetchApi('list', params, tRef.current),
+            fetchApi('list', {}, tRef.current),
             fetchApi('categories', {}, tRef.current),
           ])
           if (seq !== seqRef.current || !aliveRef.current) return
@@ -3590,7 +3674,7 @@ window.__ModuleLoader__.load({
           console.error('[dsh-quadrant-todolist] list failed', err)
           setState((prev) => ({ ...prev, loading: false, error: true }))
         }
-      }, [activeFilter])
+      }, [])
 
       const mutate = useCallback(async (method, payload, options) => {
         try {
@@ -3664,26 +3748,35 @@ window.__ModuleLoader__.load({
         return () => { alive = false }
       }, [monthCursor, dataVersion])
 
-      // 选中日那一天的实例（矩阵 / 收集箱按它筛，见 dayOccurrence 的注释）。
+      // 当前窗口（当天 / 当月 / 当年）。数字、矩阵、收集箱都只认它。
+      const windowRange = useMemo(
+        () => windowRangeOf(rangeMode, dayFilter, monthCursor),
+        [rangeMode, dayFilter, monthCursor.year, monthCursor.month],
+      )
+
+      // 窗口内的实例（矩阵 / 收集箱 / 分类计数都按它算）。
       useEffect(() => {
-        if (dayFilter === null) { setDayOccurrence(null); return undefined }
         let alive = true
-        fetchApi('occurrences', { from: dayFilter, to: dayFilter }, tRef.current)
+        fetchApi('occurrences', { from: windowRange.from, to: windowRange.to }, tRef.current)
           .then((result) => {
             if (!alive) return
             const map = new Map()
-            for (const item of Array.isArray(result?.items) ? result.items : []) map.set(item.todoId, item)
-            setDayOccurrence(map)
+            for (const item of Array.isArray(result?.items) ? result.items : []) {
+              let byDate = map.get(item.todoId)
+              if (!byDate) { byDate = new Map(); map.set(item.todoId, byDate) }
+              byDate.set(item.date, item.done === true)
+            }
+            setWindowOccurrence(map)
           })
           .catch((err) => {
             if (!alive) return
-            // 取不到就保持 null：退回旧的 dueDate 比较，宁可少显示循环任务，
+            // 取不到就保持 null：退回按 dueDate 落在窗口内，宁可少显示循环任务，
             // 也不要因为一次网络抖动把整屏清空。
-            console.error('[dsh-quadrant-todolist] day occurrences failed', err)
-            setDayOccurrence(null)
+            console.error('[dsh-quadrant-todolist] window occurrences failed', err)
+            setWindowOccurrence(null)
           })
         return () => { alive = false }
-      }, [dayFilter, dataVersion])
+      }, [windowRange.from, windowRange.to, dataVersion])
 
       const handleMonthChange = (delta) => {
         if (delta === 0) {
@@ -3787,11 +3880,19 @@ window.__ModuleLoader__.load({
         }
       }, [reload, retrying])
 
-      // 点某天 = 只看那天的计划。**不做「再点一次取消」的开关**：那样第二次点同一天
-      // 会把筛选整个撤掉，别的日期的待办一起冒出来，看起来就像筛选坏了。
-      // 想回到全部，点左栏的「全部」——它会清掉日筛选。
+      // 点某天 = 窗口切到那一天（并清掉「当月/当年」的粒度，按钮不高亮）。
+      // **不做「再点一次取消」的开关**：那样第二次点同一天会把筛选整个撤掉，
+      // 别的日期的待办一起冒出来，看起来就像筛选坏了。
       const handleSelectDay = (dayKey) => {
+        setRangeMode('day')
         setDayFilter(dayKey)
+      }
+
+      // 切窗口粒度：当月 / 当年。切过去就把选中日清掉，日历上的高亮随之消失，
+      // 免得「日历高亮着某天、数字却是整月」这种两套账。
+      const handleRangeChange = (next) => {
+        setRangeMode(next)
+        setDayFilter(null)
       }
 
       const items = state.items
@@ -3816,17 +3917,48 @@ window.__ModuleLoader__.load({
       // 矩阵 = 已归入象限的计划（**含已完成**），再叠加可选的按天筛选。
       // 排序走全局统一的 compareTodoOrder：未完成在上、全天在前、有时间的按开始时间、
       // 其余按创建日期 —— 与月视图 / 周视图全天带 / 统计清单同一套口径。
-      // 按天筛选的坑见 filterRowsByDay 的注释。
+      // 展开规则见 expandRowsForWindow：同一任务在窗口内出现几次就是几行。
+      const windowRows = useMemo(() => {
+        const expanded = expandRowsForWindow(items, windowRange, windowOccurrence)
+        return expanded.filter((row) => matchesStatus(row, statusFilter))
+      }, [items, windowRange, windowOccurrence, statusFilter])
+
+      // 分类计数：与矩阵/收集箱用**同一份** windowRows，所以「标签上是几」点进去就是几条。
+      const categoryCounts = useMemo(() => countRowsByCategory(windowRows), [windowRows])
+      const inboxCount = useMemo(
+        () => windowRows.filter((row) => !row.quadrant).length,
+        [windowRows],
+      )
+      // 标签上的数字换成算出来的（服务端的 count 是全量累计，不分月和状态）。
+      const categoriesWithCounts = useMemo(() => state.categories.map((cat) => ({
+        ...cat,
+        count: categoryCounts.get(cat.name) ?? 0,
+      })), [state.categories, categoryCounts])
+
       const quadrantItems = useMemo(() => {
-        const rows = filterRowsByDay(items.filter((item) => Boolean(item.quadrant)), dayFilter, dayOccurrence)
+        // 分类筛选改在客户端做（服务端一筛就只剩一个分类，算不出「每个分类几条」）。
+        // 三个哨兵值要自己解释：__none__ = 无分类、__inbox__ = 无象限、其余是分类名。
+        const matchesCategory = (row) => {
+          if (activeFilter === 'all') return true
+          if (activeFilter === '__none__') return asText(row.category) === ''
+          if (activeFilter === '__inbox__') return !row.quadrant
+          return asText(row.category) === activeFilter
+        }
+        const rows = windowRows.filter((item) => Boolean(item.quadrant) && matchesCategory(item))
         return rows.slice().sort(compareTodoOrder)
-      }, [items, dayFilter, dayOccurrence])
+      }, [windowRows, activeFilter])
 
       // 收集箱 = 还没有象限的任务。矩阵按象限分组，它们在那里无处可去。
       const inboxItems = useMemo(() => {
-        const rows = filterRowsByDay(items.filter((item) => !item.quadrant), dayFilter, dayOccurrence)
+        const matchesCategory = (row) => {
+          if (activeFilter === 'all') return true
+          if (activeFilter === '__none__') return asText(row.category) === ''
+          if (activeFilter === '__inbox__') return !row.quadrant
+          return asText(row.category) === activeFilter
+        }
+        const rows = windowRows.filter((item) => !item.quadrant && matchesCategory(item))
         return rows.slice().sort(compareTodoOrder)
-      }, [items, dayFilter, dayOccurrence])
+      }, [windowRows, activeFilter])
 
       const handleSelect = (id) => {
         setSelected(id)
@@ -3925,9 +4057,12 @@ window.__ModuleLoader__.load({
           h(LeftPanel, {
             t,
             activeFilter,
-            onFilterChange: (next) => { setActiveFilter(next); setDayFilter(null) },
-            categories: state.categories,
-            inboxCount: state.inboxCount,
+            // 分类和窗口是**正交**的两个维度：点分类不再清掉 dayFilter，
+            // 否则「当月」会被点一下分类打回「当天」，口径来回跳。
+            onFilterChange: setActiveFilter,
+            categories: categoriesWithCounts,
+            inboxCount,
+            uncategorizedCount: categoryCounts.get('') ?? 0,
             onCreateCategory: createCategory,
             onInboxFilter: handleInboxFilter,
             monthCursor,
@@ -3935,6 +4070,10 @@ window.__ModuleLoader__.load({
             calendarItems,
             onSelectDay: handleSelectDay,
             selectedDay: dayFilter,
+            statusFilter,
+            onStatusChange: setStatusFilter,
+            rangeMode,
+            onRangeChange: handleRangeChange,
           }),
           activeRailContent(),
           selectedItem
