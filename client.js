@@ -397,6 +397,15 @@ window.__ModuleLoader__.load({
       subtaskRow: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 30, padding: '0 4px', borderRadius: 4 },
       subtaskInput: { flex: 1, height: 28, background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', outline: 'none', padding: '0 8px', borderRadius: 4 },
       subtaskDeleteBtn: { width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      // 子计划进度徽标：详情面板顶部与矩阵行共用一套视觉。
+      subtaskProgress: { flex: 'none', alignSelf: 'center', fontSize: 11, lineHeight: '18px', padding: '0 6px', borderRadius: 9, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-tertiary)', whiteSpace: 'nowrap' },
+      subtaskProgressAll: { borderColor: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-state-business-primary)', fontWeight: 600 },
+      subtaskBadge: { flex: 'none', fontSize: 10, lineHeight: '15px', padding: '0 5px', borderRadius: 7, border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-tertiary)' },
+      subtaskBadgeAll: { borderColor: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-state-business-primary)' },
+      // 拖动排序：抓手 + 拖动中压暗 + 目标位置的顶部插入线。
+      subtaskGrip: { flex: 'none', width: 12, textAlign: 'center', fontSize: 11, lineHeight: '14px', color: 'var(--dsw-alias-label-tertiary)', cursor: 'grab', userSelect: 'none' },
+      subtaskRowDragging: { opacity: 0.45 },
+      subtaskRowDropTarget: { boxShadow: 'inset 0 2px 0 var(--dsw-alias-label-tertiary)' },
       noteTextarea: { width: '100%', minHeight: 100, borderRadius: 6, background: 'var(--dsw-specific-input-major)', color: 'var(--dsw-alias-label-primary)', fontSize: 13, fontFamily: 'inherit', padding: 10, resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: '20px' },
       divider: { height: '0.5px', background: 'var(--dsw-alias-border-l2)', margin: '12px 20px' },
       propertyRow: { display: 'flex', alignItems: 'center', height: 38, padding: '0 4px', cursor: 'pointer', borderRadius: 4, transition: 'background 0.12s' },
@@ -2749,6 +2758,9 @@ window.__ModuleLoader__.load({
       const ended = Boolean(item.isRepeating) && asText(item.dueDate) === ''
       // 已放弃：仍留在板上，但压暗并挂一个标记，避免看起来像还没开始的普通任务。
       const given = item.abandoned === true
+      // 子计划进度（与详情面板同一口径）：矩阵行上也能直接看到 3/5。
+      const subtaskTotal = Array.isArray(item.subtasks) ? item.subtasks.length : 0
+      const subtaskDone = subtaskTotal === 0 ? 0 : item.subtasks.filter((s) => s.done === true).length
       return h('div', {
         key: item.id,
         className: 'td-todo-row',
@@ -2789,6 +2801,15 @@ window.__ModuleLoader__.load({
               border: '0.5px solid var(--dsw-alias-border-l3)', color: 'var(--dsw-alias-label-tertiary)',
             },
           }, t('abandonedTag'))
+        : null,
+      // 子计划进度：矩阵行也能看出「3/5」，不必点开详情才知道。
+      // 与详情面板顶部同一个口径（done / total），全完成时用业务色强调。
+      subtaskTotal > 0
+        ? h('span', {
+            style: { ...S.subtaskBadge, ...(subtaskDone === subtaskTotal ? S.subtaskBadgeAll : null) },
+            title: `${subtaskDone}/${subtaskTotal}`,
+            'aria-label': `${subtaskDone}/${subtaskTotal}`,
+          }, `${subtaskDone}/${subtaskTotal}`)
         : null,
       // 行尾徽标与右侧详情面板的「时间」同源（startTime / startTime–endTime）。
       h('span', {
@@ -3098,7 +3119,7 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
     }
 
-    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onSave, onRemove, onClose }) {
+    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onReorderSubtasks, onSave, onRemove, onClose }) {
       const [title, setTitle] = useState(asText(item.title))
       const [note, setNote] = useState(asText(item.note))
       const [category, setCategory] = useState(asText(item.category))
@@ -3112,6 +3133,15 @@ window.__ModuleLoader__.load({
       const [timeMode, setTimeMode] = useState(() => (asText(item.endTime) === '' ? 'point' : 'range'))
       const [repeat, setRepeat] = useState(item.repeat ?? null)
       const [subtaskInput, setSubtaskInput] = useState('')
+      // 子计划拖动排序：draggingId = 正在拖的那条，dropTargetId = 落在它上面（画插入线）。
+      const [draggingId, setDraggingId] = useState(null)
+      const [dropTargetId, setDropTargetId] = useState(null)
+      // 子计划进度：**均分**（5 条每条 20%），不按工时加权。没有子计划就不显示。
+      const subtasks = Array.isArray(item.subtasks) ? item.subtasks : []
+      const subtaskDoneCount = subtasks.filter((sub) => sub.done === true).length
+      const subtaskProgress = subtasks.length === 0
+        ? null
+        : { total: subtasks.length, done: subtaskDoneCount, percent: Math.round((subtaskDoneCount / subtasks.length) * 100) }
       const [showCategoryPicker, setShowCategoryPicker] = useState(false)
       const [showQuadrantPicker, setShowQuadrantPicker] = useState(false)
       const [showRepeatDialog, setShowRepeatDialog] = useState(false)
@@ -3260,6 +3290,36 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // 拖动排序：拖起一条，落在另一条上就把它插到那条的位置。
+      // 用 HTML5 draggable（Chromium 原生支持），不需要自己算坐标。
+      const handleSubtaskDragStart = (event, sub) => {
+        setDraggingId(sub.id)
+        setDropTargetId(null)
+        try {
+          event.dataTransfer.effectAllowed = 'move'
+          event.dataTransfer.setData('text/plain', sub.id)
+        } catch (err) { /* 老环境不支持 dataTransfer，拖动仍可工作 */ }
+      }
+      const handleSubtaskDragOver = (event, sub) => {
+        if (draggingId === null || draggingId === sub.id) return
+        event.preventDefault()
+        try { event.dataTransfer.dropEffect = 'move' } catch (err) { /* 同上 */ }
+        if (dropTargetId !== sub.id) setDropTargetId(sub.id)
+      }
+      const handleSubtaskDrop = (event, sub) => {
+        event.preventDefault()
+        const from = subtasks.findIndex((row) => row.id === draggingId)
+        const to = subtasks.findIndex((row) => row.id === sub.id)
+        setDraggingId(null)
+        setDropTargetId(null)
+        if (from < 0 || to < 0 || from === to) return
+        const next = subtasks.slice()
+        const [moved] = next.splice(from, 1)
+        next.splice(to, 0, moved)
+        if (typeof onReorderSubtasks === 'function') onReorderSubtasks(next)
+      }
+      const handleSubtaskDragEnd = () => { setDraggingId(null); setDropTargetId(null) }
+
       const q = quadrant ? QUADRANT_MAP[quadrant] : null
 
       const dueDisplay = () => {
@@ -3293,6 +3353,17 @@ window.__ModuleLoader__.load({
             'aria-label': t('titlePlaceholder'),
             onChange: (e) => { setTitle(e.target.value); markDirty() },
           }),
+          // 子计划完成度：均分口径，全完成时用业务色强调。没有子计划就不占位。
+          subtaskProgress === null
+            ? null
+            : h('span', {
+                style: {
+                  ...S.subtaskProgress,
+                  ...(subtaskProgress.done === subtaskProgress.total ? S.subtaskProgressAll : null),
+                },
+                title: `${subtaskProgress.done}/${subtaskProgress.total} · ${subtaskProgress.percent}%`,
+                'aria-label': `${subtaskProgress.done}/${subtaskProgress.total} · ${subtaskProgress.percent}%`,
+              }, `${subtaskProgress.done}/${subtaskProgress.total} · ${subtaskProgress.percent}%`),
           // 关闭按钮：只收起右侧编辑面板（清空 selected），不动这条待办本身。
           // 文案复用既有的 dismiss（关闭 / Dismiss）——「清除」说的是清空某个字段的值，语气不对。
           h('button', {
@@ -3322,9 +3393,23 @@ window.__ModuleLoader__.load({
               onClick: handleAddSubtask,
             }, t('add'))),
           h('div', { style: S.subtaskList },
-            (item.subtasks ?? []).length === 0
+            subtasks.length === 0
               ? h('div', { style: { padding: '4px 0', fontSize: 12, color: 'var(--dsw-alias-label-tertiary)' } }, t('noSubtasks'))
-              : (item.subtasks ?? []).map((sub) => h('div', { key: sub.id, style: S.subtaskRow },
+              : subtasks.map((sub) => h('div', {
+                  key: sub.id,
+                  style: {
+                    ...S.subtaskRow,
+                    ...(draggingId === sub.id ? S.subtaskRowDragging : null),
+                    ...(dropTargetId === sub.id && draggingId !== null ? S.subtaskRowDropTarget : null),
+                  },
+                  // 整行可拖：拖起后落在别的行上即换位。
+                  draggable: true,
+                  onDragStart: (event) => handleSubtaskDragStart(event, sub),
+                  onDragOver: (event) => handleSubtaskDragOver(event, sub),
+                  onDrop: (event) => handleSubtaskDrop(event, sub),
+                  onDragEnd: handleSubtaskDragEnd,
+                },
+                  h('span', { style: S.subtaskGrip, 'aria-hidden': 'true' }, '⋮⋮'),
                   checkHit(
                     () => onToggleSubtask(sub),
                     h('span', {
@@ -3859,6 +3944,14 @@ window.__ModuleLoader__.load({
         await mutate('subtaskRemove', { id: selected, subtaskId: sub.id })
       }, [selected, mutate])
 
+      // 拖动排序**即时落库**（与子任务勾选一致，不等「保存」）：
+      // 否则拖完直接关面板，顺序就白改了。
+      // 复用 update 传重排后的数组——顺序即显示顺序，宿主那边 normalizeSubtasks 会保留 id。
+      const handleReorderSubtasks = useCallback(async (nextSubtasks) => {
+        if (!selected) return
+        await mutate('update', { id: selected, patch: { subtasks: nextSubtasks } })
+      }, [selected, mutate])
+
       const handleSaveSettings = useCallback(async (nextSettings) => {
         setSettings(nextSettings)
       }, [])
@@ -4088,6 +4181,7 @@ window.__ModuleLoader__.load({
                 onAddSubtask: handleAddSubtask,
                 onToggleSubtask: handleToggleSubtask,
                 onRemoveSubtask: handleRemoveSubtask,
+                onReorderSubtasks: handleReorderSubtasks,
                 onSave: handleSaveDetail,
                 onRemove: handleRemoveSelected,
                 // 关闭 = 只清空选中项；面板是靠 selectedItem 是否为 null 决定挂不挂载的。

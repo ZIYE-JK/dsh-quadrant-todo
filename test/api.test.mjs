@@ -46,10 +46,14 @@ test('setQuadrant + subtask methods drive the store correctly', async () => {
   const created = await api.create({ title: '带子计划', quadrant: 'neither' })
   const withSub = await api.subtaskAdd({ id: created.id, title: '第一步' })
   const sid = withSub.subtasks[0].id
+  // 故意再加一条**未完成**的子任务：否则「子任务全完成 → 主任务自动完成」
+  // 会让主任务变成 done、bucket 变 done，收集箱计数就不再是 1 了。
+  await api.subtaskAdd({ id: created.id, title: '第二步' })
   await api.subtaskUpdate({ id: created.id, subtaskId: sid, patch: { done: true } })
   const moved = await api.setQuadrant({ id: created.id, quadrant: null })
   assert.equal(moved.quadrant, null)
   assert.equal(moved.subtasks[0].done, true)
+  assert.equal(moved.done, false, '还有子任务没完成，主任务不应被自动完成')
   assert.equal((await api.list({})).inboxCount, 1)
 })
 
