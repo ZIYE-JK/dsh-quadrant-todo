@@ -310,7 +310,7 @@ window.__ModuleLoader__.load({
       // Main layout
       page: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, background: 'var(--dsw-alias-bg-layer-1)', color: 'var(--dsw-alias-label-primary)', fontFamily: 'var(--dsw-font-family, sans-serif)' },
       topBar: { display: 'flex', alignItems: 'center', height: 72, padding: '0 20px', flex: 'none', borderBottom: '0.5px solid var(--dsw-alias-border-l2)', background: 'var(--dsw-specific-input-major)' },
-      mainBody: { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' },
+      mainBody: { display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' },
       // Left rail
       leftRail: { width: 120, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 4 },
       railItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 0', width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 8, transition: 'background 0.12s', fontSize: 11, color: 'var(--dsw-alias-label-secondary)' },
@@ -370,7 +370,7 @@ window.__ModuleLoader__.load({
       matrixArea: { flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 16, padding: 16, overflow: 'hidden' },
       quadrantCard: { background: 'var(--dsw-specific-input-major)', borderRadius: 'var(--dsw-radius-lg)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', border: '0.5px solid var(--dsw-alias-border-l2)' },
       quadrantHead: { display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '0 16px', flex: 'none', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
-      quadrantTitle: { fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0 },
+      quadrantTitle: { fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       quadrantAddBtn: { width: 28, height: 28, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 18, color: 'var(--dsw-alias-label-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
       quadrantBody: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 12px 12px' },
       emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '40px 20px', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 },
@@ -385,6 +385,12 @@ window.__ModuleLoader__.load({
       todoTitleDone: { textDecoration: 'line-through', color: 'var(--dsw-alias-label-tertiary)' },
       // Detail panel
       detailPanel: { width: 497, flex: 'none', background: 'var(--dsw-specific-input-major)', borderLeft: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
+      // 窄窗口：详情面板改成**浮层**盖在右侧，不再从矩阵手里抢宽度。
+      // 编辑时本来就看不到矩阵，遮挡没有实际损失；换来的是四象限始终完整。
+      detailPanelFloating: {
+        position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 30,
+        boxShadow: '-8px 0 24px rgba(0, 0, 0, 0.12)', borderLeft: '0.5px solid var(--dsw-alias-border-l3)',
+      },
       detailHeader: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '20px 20px 12px' },
       detailIcon: { width: 24, height: 24, borderRadius: '50%', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
       detailTitleInput: { flex: 1, fontSize: 18, fontWeight: 600, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontFamily: 'inherit', outline: 'none', padding: 0, lineHeight: '28px' },
@@ -2540,7 +2546,7 @@ window.__ModuleLoader__.load({
               : null)))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, uncategorizedCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay, statusFilter, onStatusChange, rangeMode, onRangeChange }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, uncategorizedCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay, statusFilter, onStatusChange, rangeMode, onRangeChange, width }) {
       // 「+ 新建分类」就地展开一行输入：不再打开旧的「管理分类」弹窗。
       const [creating, setCreating] = useState(false)
       const [draft, setDraft] = useState('')
@@ -2598,7 +2604,7 @@ window.__ModuleLoader__.load({
         return () => document.removeEventListener('pointerdown', onPointerDown)
       }, [creating])
 
-      return h('div', { style: S.leftPanel },
+      return h('div', { style: width ? { ...S.leftPanel, width } : S.leftPanel },
         // 收集箱：分组里只有它自己一个成员，原来的「标题 + 唯一成员」等于把同一个词
         // 写了两遍。合并成一行——既当分组标题，也当筛选项。
         h('div', { style: S.panelSection },
@@ -2903,6 +2909,33 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 视口宽度（跟随窗口缩放）。
+     *
+     * 为什么需要它：左栏 120 + 左面板 369 + 详情面板 497 是**固定宽度**，合计 986。
+     * 笔记本上窗口只有 1200 出头，矩阵就只剩 ~200px，四个象限每格 100px，
+     * 「紧急不重要」这种标题只能逐字竖排。大屏 1600+ 时剩 600+，所以一直没暴露。
+     *
+     * 阈值 1500：低于它就把详情面板改成浮层、左面板收窄，让矩阵拿回宽度。
+     */
+    const NARROW_VIEWPORT = 1500
+
+    function useViewportWidth() {
+      const [width, setWidth] = useState(() => {
+        if (typeof window === 'undefined') return 1600
+        return Number(window.innerWidth) || 1600
+      })
+      useEffect(() => {
+        const onResize = () => {
+          const next = Number(window.innerWidth) || 0
+          if (next > 0) setWidth(next)
+        }
+        window.addEventListener('resize', onResize)
+        return () => window.removeEventListener('resize', onResize)
+      }, [])
+      return width
+    }
+
+    /**
      * 完成期限：四个预设（当天 / 本周内 / 本周工作日内 / 自定义）+ 超期处理。
      * 保存时把 { dueDate, duePreset, onOverdue } 三件一起交回详情面板。
      */
@@ -3119,7 +3152,7 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'td-primary', style: S.btnPrimary, onClick: submit }, t('save')))))
     }
 
-    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onReorderSubtasks, onSave, onRemove, onClose }) {
+    function DetailPanel({ t, item, categories, onCreateCategory, onAddSubtask, onToggleSubtask, onRemoveSubtask, onReorderSubtasks, onSave, onRemove, onClose, width, floating }) {
       const [title, setTitle] = useState(asText(item.title))
       const [note, setNote] = useState(asText(item.note))
       const [category, setCategory] = useState(asText(item.category))
@@ -3341,7 +3374,10 @@ window.__ModuleLoader__.load({
       const timeInvalid = startTime !== '' && timeMode === 'range' && endTime !== ''
         && storedEndOf(endTime, startTime) <= startTime
 
-      return h('div', { style: S.detailPanel },
+      return h('div', {
+        // 窄窗口下 floating 生效：绝对定位覆盖右侧，矩阵宽度不再被它挤压。
+        style: { ...S.detailPanel, ...(floating ? S.detailPanelFloating : null), ...(width ? { width } : null) },
+      },
         // Header
         h('div', { style: S.detailHeader },
           h('div', { style: { ...S.detailIcon, background: q ? q.color : 'var(--dsw-alias-label-tertiary)' }, 'aria-hidden': 'true' }),
@@ -3686,6 +3722,9 @@ window.__ModuleLoader__.load({
 
     function TodoPage(props) {
       const t = props.t ?? ((key) => dict.zh[key] ?? key)
+      // 视口宽度：决定详情面板是并排还是浮层（见 useViewportWidth 的注释）。
+      const viewportWidth = useViewportWidth()
+      const narrowViewport = viewportWidth < NARROW_VIEWPORT
       const [state, setState] = useState({ loading: true, error: null, items: [], summary: {}, notices: [], staleDays: 7, inboxCount: 0, categories: [] })
       const [activeRail, setActiveRail] = useState('plan')
       const [activeFilter, setActiveFilter] = useState('all')
@@ -4167,6 +4206,8 @@ window.__ModuleLoader__.load({
             onStatusChange: setStatusFilter,
             rangeMode,
             onRangeChange: handleRangeChange,
+            // 窄窗口把左面板收窄（日历 7 列本来就够用），把宽度让给矩阵。
+            width: narrowViewport ? 320 : undefined,
           }),
           activeRailContent(),
           selectedItem
@@ -4184,6 +4225,9 @@ window.__ModuleLoader__.load({
                 onReorderSubtasks: handleReorderSubtasks,
                 onSave: handleSaveDetail,
                 onRemove: handleRemoveSelected,
+                // 窄窗口：浮层覆盖，别把矩阵压成竖排文字。
+                floating: narrowViewport,
+                width: narrowViewport ? 420 : Math.min(497, Math.round(viewportWidth * 0.38)),
                 // 关闭 = 只清空选中项；面板是靠 selectedItem 是否为 null 决定挂不挂载的。
                 onClose: () => setSelected(null),
               })
