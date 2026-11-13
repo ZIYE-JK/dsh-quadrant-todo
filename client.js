@@ -4125,17 +4125,6 @@ window.__ModuleLoader__.load({
       }
 
       const items = state.items
-      // 详情面板优先用**被点中的那一次实例**：循环任务同一条会有多行，
-      // list() 给的是「本次周期那一次」，未必是用户点的。实例行还带着单次覆盖后的
-      // 标题/时间，面板必须显示用户实际看到的值。
-      const selectedItem = (() => {
-        const base = items.find((item) => item.id === selected) ?? null
-        if (base === null) return null
-        if (!base.isRepeating || !selectedOccurrence) return base
-        const row = windowRows.find((item) => item.id === selected
-          && asText(item.occurrenceDate) === selectedOccurrence)
-        return row ?? base
-      })()
       // 通知开关直接反映宿主持久化的设置，不再单独存一份本地状态（否则两者会漂移）。
       const notificationOn = Boolean(settings && settings.notify && settings.notify.system)
 
@@ -4161,6 +4150,21 @@ window.__ModuleLoader__.load({
         const expanded = expandRowsForWindow(items, windowRange, windowOccurrence)
         return expanded.filter((row) => matchesStatus(row, statusFilter))
       }, [items, windowRange, windowOccurrence, statusFilter])
+
+      // 详情面板优先用**被点中的那一次实例**：循环任务同一条会有多行，
+      // list() 给的是「本次周期那一次」，未必是用户点的。实例行还带着单次覆盖后的
+      // 标题/时间，面板必须显示用户实际看到的值。
+      //
+      // ⚠️ 必须放在 windowRows **之后**：`const` 有暂时性死区，写在前面的话
+      // 打开任意一条循环待办都会抛 ReferenceError，整个面板白屏。
+      const selectedItem = (() => {
+        const base = items.find((item) => item.id === selected) ?? null
+        if (base === null) return null
+        if (!base.isRepeating || !selectedOccurrence) return base
+        const row = windowRows.find((item) => item.id === selected
+          && asText(item.occurrenceDate) === selectedOccurrence)
+        return row ?? base
+      })()
 
       // 分类计数：与矩阵/收集箱用**同一份** windowRows，所以「标签上是几」点进去就是几条。
       const categoryCounts = useMemo(() => countRowsByCategory(windowRows), [windowRows])
