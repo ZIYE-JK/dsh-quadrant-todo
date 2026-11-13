@@ -90,6 +90,35 @@ test('仅本次：非发生日拒绝写入', async () => {
   )
 })
 
+test('仅本次挪期后：单日窗口要在新日期上查得到（旧日期不再有它）', async () => {
+  const store = await harness()
+  const todo = await monthly13(store)
+  await store.overrideOccurrence(todo.id, '2026-11-13', { dueDate: '2026-11-16' })
+
+  // 真实踩到：日历（查整月）有红点，但点 16 号那天矩阵是空的 ——
+  // 因为 occurrencesBetween 只产出规则自己的 13 号，基础日不在单日窗口里，
+  // 被挪到 16 号的那次就永远发射不出来。
+  const moved = (await store.occurrences({ from: '2026-11-16', to: '2026-11-16' })).items
+  assert.equal(moved.length, 1, '11-16 单日必须查得到')
+  assert.equal(moved[0].date, '2026-11-16')
+  assert.equal(moved[0].occurrenceDate, '2026-11-13', '身份仍是原来那一次')
+
+  const original = (await store.occurrences({ from: '2026-11-13', to: '2026-11-13' })).items
+  assert.equal(original.length, 0, '原日期不该再出现这一次')
+
+  const month = (await store.occurrences({ from: '2026-11-01', to: '2026-11-30' })).items
+  assert.deepEqual(datesOf(month), ['2026-11-16'], '整月只有一次，且落在 16 号')
+})
+
+test('仅本次挪出窗口后，不再出现在该窗口里', async () => {
+  const store = await harness()
+  const todo = await monthly13(store)
+  // 把 12 月那次挪到 1 月
+  await store.overrideOccurrence(todo.id, '2026-12-13', { dueDate: '2027-01-05' })
+  assert.deepEqual(await dayOf(store, '2026-12-01', '2026-12-31'), [], '12 月不该再有它')
+  assert.deepEqual(await dayOf(store, '2027-01-05', '2027-01-05'), ['2027-01-05'], '落到新日期')
+})
+
 test('本次及未来：拆系列，旧段截到前一天，新段从分界日重新开始', async () => {
   const store = await harness()
   const todo = await monthly13(store)
