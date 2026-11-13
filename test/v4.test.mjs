@@ -163,7 +163,7 @@ test('v3 -> v4 migrates dueTime into startTime and adds the new fields', async (
   const { store, file } = await make(v3)
   const res = await store.load()
   assert.equal(res.migrated.from, 3)
-  assert.equal(res.migrated.to, 4)
+  assert.equal(res.migrated.to, 5)
   assert.equal(res.migrated.movedTimes, 1, 'only the row that had no startTime is folded')
 
   const byId = Object.fromEntries((await store.list({})).items.map((t) => [t.id, t]))
@@ -174,7 +174,7 @@ test('v3 -> v4 migrates dueTime into startTime and adds the new fields', async (
   assert.equal(byId.a.onOverdue, 'none')
   assert.equal(byId.a.abandoned, false)
   assert.equal(byId.a.duePreset, null)
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).version, 4)
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).version, 5)
 })
 
 test('the migration backup is named after its real source version', async () => {

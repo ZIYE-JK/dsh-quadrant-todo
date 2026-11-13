@@ -53,7 +53,16 @@ const once = {
 /** occurrences 的真实形状：Map<todoId, Map<date, done>> */
 const occ = (entries) => {
   const map = new Map()
-  for (const [id, pairs] of entries) map.set(id, new Map(pairs))
+  for (const [id, pairs] of entries) {
+    // 值形状已升级为「那次发生的全部信息」：done / 原始日期 / 是否被单次覆盖。
+    // 测试里允许写成 [date, done] 或 [date, {done, occurrenceDate}] 两种。
+    map.set(id, new Map(pairs.map(([day, value]) => [
+      day,
+      typeof value === 'object' && value !== null
+        ? { done: value.done === true, occurrenceDate: value.occurrenceDate ?? day, overridden: value.overridden === true }
+        : { done: value === true, occurrenceDate: day, overridden: false },
+    ])))
+  }
   return map
 }
 

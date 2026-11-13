@@ -52,6 +52,11 @@ window.__ModuleLoader__.load({
         all: '全部', uncategorized: '无分类', newCategory: '新建分类',
         allCategories: '全部分类', statusAll: '全部', statusDone: '已完成', statusTodo: '待办',
         rangeMonth: '当月', rangeYear: '当年',
+        saveScopeTitle: '这条是重复待办，改哪里？',
+        saveScopeHint: '以 {date} 这一次为基准',
+        saveScopeThis: '仅本次 — 只改这一次，其余按原规则',
+        saveScopeFuture: '本次及未来 — 从这一次起改用新设置',
+        saveScopeAll: '整个系列 — 所有这一次（含已过）',
         monthTitle: '{year}年{month}月', backToToday: '回到今天',
         quadrantUrgentImportant: '重要且紧急',
         quadrantUrgentNotImportant: '紧急不重要',
@@ -154,6 +159,11 @@ window.__ModuleLoader__.load({
         all: 'All', uncategorized: 'No category', newCategory: 'New category',
         allCategories: 'All categories', statusAll: 'All', statusDone: 'Done', statusTodo: 'To do',
         rangeMonth: 'Month', rangeYear: 'Year',
+        saveScopeTitle: 'This is a repeating todo — what should change?',
+        saveScopeHint: 'Relative to the {date} occurrence',
+        saveScopeThis: 'This one only — leave the rest on the old rule',
+        saveScopeFuture: 'This and future — use the new settings from here on',
+        saveScopeAll: 'The whole series — every occurrence',
         monthTitle: '{year} {{month}}', backToToday: 'Back to today',
         quadrantUrgentImportant: 'Urgent & Important',
         quadrantUrgentNotImportant: 'Urgent & Not Important',
@@ -420,6 +430,12 @@ window.__ModuleLoader__.load({
       propertyChevron: { flex: 'none', display: 'flex', alignItems: 'center', color: 'var(--dsw-alias-label-tertiary)', marginLeft: 4 },
       saveBtn: { height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 13, cursor: 'pointer', fontWeight: 500 },
       saveBtnContainer: { display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 20px', flex: 'none' },
+      // 「保存范围」选择器：贴在底部按钮上方，三条路各一个按钮。
+      scopeSheet: { margin: '0 20px 12px', padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'var(--dsw-alias-bg-layer-1)', display: 'flex', flexDirection: 'column', gap: 6 },
+      scopeTitle: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      scopeHint: { fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 2 },
+      scopeBtn: { height: 30, padding: '0 10px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 12, cursor: 'pointer', textAlign: 'left' },
+      scopeCancel: { height: 26, padding: '0 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', textAlign: 'right' },
       // Shared UI primitives
       overlay: { position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--dsw-alias-bg-mask-1)' },
       dialog: { width: 560, maxWidth: 'calc(100vw - 32px)', maxHeight: '82vh', overflowY: 'auto', boxSizing: 'border-box', padding: '22px 24px 18px', background: 'var(--dsw-specific-input-major)', borderRadius: 'var(--dsw-radius-xl)', boxShadow: 'var(--dsw-elevation-panel)', color: 'var(--dsw-alias-label-primary)' },
@@ -729,9 +745,14 @@ window.__ModuleLoader__.load({
       return dateKeyOf(date) === text ? date : null
     }
 
-    function isoWeekday(date) {
-      return ((date.getDay() + 6) % 7) + 1
+    /** 日期键里的「几号」（1-31）；不是合法日期键就返回 null。 */
+    function dayOfKey(key) {
+      const date = parseDateKey(key)
+      return date === null ? null : date.getDate()
     }
+
+    function isoWeekday(date) {
+      return ((date.getDay() + 6) % 7) + 1    }
 
     function shiftKeyLocal(key, days) {
       const date = parseDateKey(key)
@@ -1157,10 +1178,19 @@ window.__ModuleLoader__.load({
       for (const item of rows) {
         const byDate = occurrences.get(item.id)
         if (!byDate) continue
-        for (const [date, done] of byDate) {
+        for (const [date, info] of byDate) {
           if (date < range.from || date > range.to) continue
           // dueDate / done 都按那一天算，否则在矩阵里勾选会写到系列起点那天去。
-          out.push({ ...item, dueDate: date, nextDue: date, done: done === true })
+          // occurrenceDate 是这次发生的**身份**：实例被「仅本次」挪到别的日子后，
+          // 勾选仍要按原始日期记账，否则宿主会判 isDueOn 失败。
+          out.push({
+            ...item,
+            dueDate: date,
+            nextDue: date,
+            done: info.done === true,
+            occurrenceDate: info.occurrenceDate ?? date,
+            overridden: info.overridden === true,
+          })
         }
       }
       out.sort((a, b) => asText(a.dueDate).localeCompare(asText(b.dueDate)))
@@ -1182,6 +1212,18 @@ window.__ModuleLoader__.load({
         counts.set(key, (counts.get(key) ?? 0) + 1)
       }
       return counts
+    }
+
+    /**
+     * 一行的 React key。
+     *
+     * 窗口展开后**同一条循环任务会产出多行**（同一个 id、不同 dueDate），
+     * 所以 key 必须带上实例日期；只用 id 会让兄弟 key 重复 —— React 无法正确对账，
+     * 切换「当月/当年/当天」时旧节点不被卸载，DOM 越堆越多，
+     * 看起来就是同一条待办重复出现了十几次（而表头计数来自数据，仍然是对的）。
+     */
+    function rowKeyOf(item) {
+      return `${asText(item.id)}@${asText(item.dueDate)}`
     }
 
     function deadlineTitle(item, t) {
@@ -2771,7 +2813,7 @@ window.__ModuleLoader__.load({
         key: item.id,
         className: 'td-todo-row',
         style: { ...(selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow), ...(given ? { opacity: 0.55 } : null) },
-        onClick: () => onSelect(item.id),
+        onClick: () => onSelect(item.id, item.occurrenceDate ?? item.dueDate),
       },
       checkHit(
         () => { if (!ended) onToggle(item) },
@@ -2798,7 +2840,7 @@ window.__ModuleLoader__.load({
         className: 'td-title',
         'aria-current': selected ? 'true' : 'false',
         style: done ? S.todoTitleDone : S.todoTitle,
-        onClick: (e) => { e.stopPropagation(); onSelect(item.id) },
+        onClick: (e) => { e.stopPropagation(); onSelect(item.id, item.occurrenceDate ?? item.dueDate) },
       }, asText(item.title)),
       given
         ? h('span', {
@@ -2863,7 +2905,7 @@ window.__ModuleLoader__.load({
                     h(Icon, { name: 'clipboardX', size: 48, style: { color: 'var(--dsw-alias-label-tertiary)', opacity: 0.4 } }),
                     h('span', null, t(emptyCaptions[q.key])))
                 : qItems.map((item) => h(TodoRow, {
-                    key: item.id, t, item, selectedId, onSelect, onToggle,
+                    key: rowKeyOf(item), t, item, selectedId, onSelect, onToggle,
                   }))))
         }))
     }
@@ -2889,7 +2931,7 @@ window.__ModuleLoader__.load({
           h('div', { style: S.quadrantBody },
             items.length === 0
               ? h('div', { style: S.emptyState }, h('span', null, t('empty')))
-              : items.map((item) => h(TodoRow, { key: item.id, t, item, selectedId, onSelect, onToggle })))))
+              : items.map((item) => h(TodoRow, { key: rowKeyOf(item), t, item, selectedId, onSelect, onToggle })))))
     }
 
     /** Esc 关闭：弹窗自己挂 document 监听，避免每个组件抄一遍。 */
@@ -3256,6 +3298,9 @@ window.__ModuleLoader__.load({
 
       // 删除是两步确认（3 秒内再点一次），与旧版行为一致：避免误删。
       const [confirmingDelete, setConfirmingDelete] = useState(false)
+      // 循环待办点「保存」时先问范围：仅本次 / 本次及未来 / 整个系列。
+      // 非循环任务不弹，直接保存（没有歧义）。
+      const [scopeOpen, setScopeOpen] = useState(false)
       const deleteTimer = useRef(null)
       useEffect(() => () => {
         if (deleteTimer.current !== null) window.clearTimeout(deleteTimer.current)
@@ -3271,7 +3316,7 @@ window.__ModuleLoader__.load({
         void onRemove()
       }
 
-      const handleSave = async () => {
+      const handleSave = async (scope) => {
         setSaving(true)
         setSavedMsg(null)
         try {
@@ -3298,10 +3343,11 @@ window.__ModuleLoader__.load({
             endTime: storedEnd === '' ? null : storedEnd,
             repeat: repeat || null,
           }
-          const ok = await onSave(payload)
+          const ok = await onSave(payload, scope ?? 'all', item.occurrenceDate ?? item.dueDate)
           // onSave 返回布尔而不抛错；不检查就会把失败也显示成「已保存」。
           if (ok === false) throw new Error('save-failed')
           setDirty(false)
+          setScopeOpen(false)
           setSavedMsg({ ok: true, msg: t('saveSuccess') })
           setTimeout(() => setSavedMsg(null), 2500)
         } catch (err) {
@@ -3373,6 +3419,30 @@ window.__ModuleLoader__.load({
       // 校验用存储形式（00:00 在开始不是 00:00 时等于 24:00），否则 23:00–00:00 会被当成倒序。
       const timeInvalid = startTime !== '' && timeMode === 'range' && endTime !== ''
         && storedEndOf(endTime, startTime) <= startTime
+
+      // 「保存范围」选择器：只在循环待办上出现。
+      // 先算成变量再当子节点用 —— 直接写进 return 会让括号叠太多层，容易错。
+      const scopeSheet = scopeOpen && item.repeat
+        ? h('div', { style: S.scopeSheet, role: 'dialog', 'aria-label': t('saveScopeTitle') },
+            h('div', { style: S.scopeTitle }, t('saveScopeTitle')),
+            h('div', { style: S.scopeHint },
+              String(t('saveScopeHint')).replace('{date}', asText(item.occurrenceDate) || asText(item.dueDate))),
+            [['this', 'saveScopeThis'], ['future', 'saveScopeFuture'], ['all', 'saveScopeAll']].map(([scope, label]) =>
+              h('button', {
+                key: scope,
+                type: 'button',
+                className: 'td-btn',
+                style: S.scopeBtn,
+                disabled: saving,
+                onClick: () => void handleSave(scope),
+              }, t(label))),
+            h('button', {
+              type: 'button',
+              className: 'td-btn',
+              style: S.scopeCancel,
+              onClick: () => setScopeOpen(false),
+            }, t('cancel')))
+        : null
 
       return h('div', {
         // 窄窗口下 floating 生效：绝对定位覆盖右侧，矩阵宽度不再被它挤压。
@@ -3617,8 +3687,11 @@ window.__ModuleLoader__.load({
             className: 'td-primary',
             style: S.saveBtn,
             disabled: saving,
-            onClick: handleSave,
-          }, saving ? t('loading') : t('save'))))
+            // 循环待办先问范围；普通待办直接存，没有歧义。
+            onClick: () => { if (item.repeat) setScopeOpen(true); else void handleSave('all') },
+          }, saving ? t('loading') : t('save'))),
+
+        scopeSheet)
     }
 
     let corruptDismissed = false
@@ -3729,6 +3802,8 @@ window.__ModuleLoader__.load({
       const [activeRail, setActiveRail] = useState('plan')
       const [activeFilter, setActiveFilter] = useState('all')
       const [selected, setSelected] = useState(null)
+      // 被点中的那次发生日（循环任务「仅本次」靠它认出是哪一次）。null = 没点具体实例。
+      const [selectedOccurrence, setSelectedOccurrence] = useState(null)
       const [dialog, setDialog] = useState(null)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
       const [calendarItems, setCalendarItems] = useState([])
@@ -3888,7 +3963,12 @@ window.__ModuleLoader__.load({
             for (const item of Array.isArray(result?.items) ? result.items : []) {
               let byDate = map.get(item.todoId)
               if (!byDate) { byDate = new Map(); map.set(item.todoId, byDate) }
-              byDate.set(item.date, item.done === true)
+              // 值不再是布尔，而是那次发生的全部信息：done / 原始日期 / 是否被单次覆盖。
+              byDate.set(item.date, {
+                done: item.done === true,
+                occurrenceDate: item.occurrenceDate ?? item.date,
+                overridden: item.overridden === true,
+              })
             }
             setWindowOccurrence(map)
           })
@@ -3937,16 +4017,33 @@ window.__ModuleLoader__.load({
       const handleToggle = useCallback((item) => {
         const payload = { id: item.id, done: !item.done }
         if (item.isRepeating) {
-          if (!item.dueDate) return
-          payload.date = item.dueDate
+          // 用**这次发生的身份日**：实例被「仅本次」挪到别的日子后，
+          // 传新日期会被宿主判成「不是发生日」。
+          const day = asText(item.occurrenceDate) || asText(item.dueDate)
+          if (day === '') return
+          payload.date = day
         }
         void mutate('complete', payload)
       }, [mutate])
 
-      const handleSaveDetail = useCallback(async (payload) => {
+      /**
+       * 保存循环待办时的三种范围：
+       *   all    整个系列（现状：改这条记录）
+       *   this   仅本次（写 overrides[那一天]）
+       *   future 本次及未来（以那天为界拆系列）
+       */
+      const handleSaveDetail = useCallback(async (payload, scope, occurrenceDate) => {
         if (!selected) return false
-        const ok = await mutate('update', { id: selected, patch: payload })
-        return ok
+        const day = asText(occurrenceDate) || asText(payload?.dueDate)
+        if (scope === 'this') {
+          if (day === '') return false
+          return mutate('overrideOccurrence', { id: selected, date: day, patch: payload })
+        }
+        if (scope === 'future') {
+          if (day === '') return false
+          return mutate('splitSeries', { id: selected, from: day, patch: payload })
+        }
+        return mutate('update', { id: selected, patch: payload })
       }, [selected, mutate])
 
       // 周视图拖拽/键盘改期：next 只带 startTime / endTime，其余字段由宿主端 patch 合并。
@@ -4028,7 +4125,17 @@ window.__ModuleLoader__.load({
       }
 
       const items = state.items
-      const selectedItem = items.find((item) => item.id === selected) ?? null
+      // 详情面板优先用**被点中的那一次实例**：循环任务同一条会有多行，
+      // list() 给的是「本次周期那一次」，未必是用户点的。实例行还带着单次覆盖后的
+      // 标题/时间，面板必须显示用户实际看到的值。
+      const selectedItem = (() => {
+        const base = items.find((item) => item.id === selected) ?? null
+        if (base === null) return null
+        if (!base.isRepeating || !selectedOccurrence) return base
+        const row = windowRows.find((item) => item.id === selected
+          && asText(item.occurrenceDate) === selectedOccurrence)
+        return row ?? base
+      })()
       // 通知开关直接反映宿主持久化的设置，不再单独存一份本地状态（否则两者会漂移）。
       const notificationOn = Boolean(settings && settings.notify && settings.notify.system)
 
@@ -4092,8 +4199,11 @@ window.__ModuleLoader__.load({
         return rows.slice().sort(compareTodoOrder)
       }, [windowRows, activeFilter])
 
-      const handleSelect = (id) => {
+      // 点某一行的第二条参数是「这次发生的身份日」：循环任务同一条会展开成多行，
+      // 只按 id 记，详情面板就不知道用户点的是哪一次（「仅本次」必须要它）。
+      const handleSelect = (id, date) => {
         setSelected(id)
+        setSelectedOccurrence(date === undefined ? null : date)
       }
 
       // Render
@@ -4214,7 +4324,8 @@ window.__ModuleLoader__.load({
             ? h(DetailPanel, {
                 // key 让切换待办时重建组件：否则上一条的 dirty 状态会跟着复用，
                 // 新条目就再也同步不到服务端的值。
-                key: selectedItem.id,
+                // 循环任务同一 id 会有多次发生 —— 必须带上实例日期，否则切到另一次不重建。
+                key: `${selectedItem.id}@${asText(selectedItem.occurrenceDate) || asText(selectedItem.dueDate)}`,
                 t,
                 item: selectedItem,
                 categories: state.categories,
@@ -4290,7 +4401,10 @@ window.__ModuleLoader__.load({
         quadrant: editing && QUADRANT_MAP[initial.quadrant] ? initial.quadrant : (initial?.quadrant ?? null),
         repeatFreq: initial?.repeat?.freq ?? '',
         weekdays: initial?.repeat?.weekdays ?? [],
-        monthDay: initial?.repeat?.monthDay ?? new Date().getDate(),
+        // 「每月几号」默认跟着**完成期限**走，不能取今天：
+        // 今天 13 号、建一条 11-20 的每月任务，会得到「规则 13 号 + 起点 20 号」——
+        // 起点晚于当月锚点，一建出来当月就看不见。
+        monthDay: initial?.repeat?.monthDay ?? dayOfKey(initial?.dueDate) ?? new Date().getDate(),
         until: initial?.repeat?.until ?? '',
       }))
       const [quick, setQuick] = useState('')

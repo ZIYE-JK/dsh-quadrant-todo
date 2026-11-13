@@ -86,7 +86,7 @@ test('v2 -> v3 migration adds null blocks and sanitizes bad values', async () =>
   const { store, file } = await make(v2)
   const res = await store.load()
   assert.equal(res.migrated.from, 2)
-  assert.equal(res.migrated.to, 4)
+  assert.equal(res.migrated.to, 5)
   const byId = Object.fromEntries((await store.list({})).items.map((t) => [t.id, t]))
   assert.equal(byId.a.startTime, '11:00', 'a v2 row with only dueTime gets it folded into startTime')
   assert.equal(byId.a.endTime, null)
@@ -95,7 +95,7 @@ test('v2 -> v3 migration adds null blocks and sanitizes bad values', async () =>
   assert.equal(byId.c.endTime, null, 'reversed range drops the end, keeps the start')
   assert.equal(byId.c.startTime, '15:00')
   const written = JSON.parse(await readFile(file, 'utf8'))
-  assert.equal(written.version, 4)
+  assert.equal(written.version, 5)
   assert.equal(byId.a.dueTime, null, 'v4 folds dueTime into startTime and stops storing it')
 })
 

@@ -77,7 +77,12 @@ const todo = (subtasks) => ({
 })
 
 const BASE = {
-  t: (k) => ({ noSubtasks: '暂无子计划', add: '添加', subtaskPlaceholder: '输入子计划…', dismiss: '关闭', save: '保存', remove: '删除' }[k] ?? k),
+  t: (k) => ({
+    noSubtasks: '暂无子计划', add: '添加', subtaskPlaceholder: '输入子计划…', dismiss: '关闭',
+    save: '保存', remove: '删除', cancel: '取消', loading: '保存中',
+    saveScopeTitle: '这条是重复待办，改哪里？', saveScopeHint: '以 {date} 这一次为基准',
+    saveScopeThis: '仅本次', saveScopeFuture: '本次及未来', saveScopeAll: '整个系列',
+  }[k] ?? k),
   categories: [],
   onCreateCategory: async () => {},
   onAddSubtask: async () => {},
@@ -177,4 +182,67 @@ test('把第 1 条拖到第 2 条上 → 回调收到交换后的顺序', () => 
   tree = h.render(props)
   rowOf(tree, 'JP-Amazon').props.onDrop(fakeDragEvent())
   assert.deepEqual(received, [['s2', 's3', 's1']], '第 1 条移到第 3 条位置')
+})
+
+// --- 循环待办的「保存范围」三选一 ---
+
+/** 找到「保存」按钮（td-primary + save 文案）。 */
+function saveBtnOf(tree) {
+  let hit = null
+  walk(tree, (n) => {
+    if (hit || n.type !== 'button') return
+    if (n.props && n.props.className === 'td-primary' && textOf(n).includes('保存')) hit = n
+  })
+  return hit
+}
+
+test('普通待办不弹范围选择器，点保存直接存（scope=all）', () => {
+  const h = load()
+  h.reset()
+  const calls = []
+  const props = { ...BASE, onSave: (payload, scope) => { calls.push(scope); return Promise.resolve(true) }, item: todo([]) }
+  let tree = h.render(props)
+  saveBtnOf(tree).props.onClick()
+  // 同步拿不到 async 结果，重新渲染确认没有弹出选择器
+  tree = h.render(props)
+  assert.ok(!textOf(tree).includes('这条是重复待办'), '没有弹选择器')
+  return Promise.resolve().then(() => assert.deepEqual(calls, ['all'], '直接按整个系列保存'))
+})
+
+test('循环待办点保存 → 弹出三选一，且不先落库', () => {
+  const h = load()
+  h.reset()
+  const calls = []
+  const props = {
+    ...BASE,
+    onSave: (payload, scope) => { calls.push(scope); return Promise.resolve(true) },
+    item: { ...todo([]), repeat: { freq: 'monthly', monthDay: 13 }, occurrenceDate: '2026-11-13' },
+  }
+  let tree = h.render(props)
+  saveBtnOf(tree).props.onClick()
+  // scopeOpen 已置位：重新渲染应看到选择器与基准日
+  tree = h.render(props)
+  const text = textOf(tree)
+  for (const label of ['仅本次', '本次及未来', '整个系列']) assert.ok(text.includes(label), `缺少 ${label}`)
+  assert.ok(text.includes('2026-11-13'), '提示里带上了这一次的日期')
+  assert.deepEqual(calls, [], '还没选范围，不该先保存')
+})
+
+test('选了「仅本次」→ 回调收到 scope=this 和这次的身份日', () => {
+  const h = load()
+  h.reset()
+  const calls = []
+  const props = {
+    ...BASE,
+    onSave: (payload, scope, occurrenceDate) => { calls.push([scope, occurrenceDate]); return Promise.resolve(true) },
+    item: { ...todo([]), repeat: { freq: 'monthly', monthDay: 13 }, occurrenceDate: '2026-11-13' },
+  }
+  let tree = h.render(props)
+  saveBtnOf(tree).props.onClick()
+  tree = h.render(props)
+  let target = null
+  walk(tree, (n) => { if (!target && n.type === 'button' && textOf(n).trim() === '仅本次') target = n })
+  assert.ok(target, '找到「仅本次」按钮')
+  target.props.onClick()
+  return Promise.resolve().then(() => assert.deepEqual(calls, [['this', '2026-11-13']]))
 })
