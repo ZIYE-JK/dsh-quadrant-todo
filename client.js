@@ -58,6 +58,7 @@ window.__ModuleLoader__.load({
         saveScopeThis: '仅本次 — 只改这一次，其余按原规则',
         saveScopeFuture: '本次及未来 — 从这一次起改用新设置',
         saveScopeAll: '整个系列 — 所有这一次（含已过）',
+        dropScopeHint: '把 {from} 这一次改到 {to}，其余信息不变',
         monthTitle: '{year}年{month}月', backToToday: '回到今天',
         quadrantUrgentImportant: '重要且紧急',
         quadrantUrgentNotImportant: '紧急不重要',
@@ -166,6 +167,7 @@ window.__ModuleLoader__.load({
         saveScopeThis: 'This one only — leave the rest on the old rule',
         saveScopeFuture: 'This and future — use the new settings from here on',
         saveScopeAll: 'The whole series — every occurrence',
+        dropScopeHint: 'Move the {from} occurrence to {to}; everything else stays',
         monthTitle: '{year} {{month}}', backToToday: 'Back to today',
         quadrantUrgentImportant: 'Urgent & Important',
         quadrantUrgentNotImportant: 'Urgent & Not Important',
@@ -343,6 +345,8 @@ window.__ModuleLoader__.load({
       calendarCell: { height: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4, fontSize: 11, color: 'var(--dsw-alias-label-primary)', position: 'relative', padding: 0 },
       calendarCellToday: { fontWeight: 600, color: 'var(--dsw-alias-state-business-primary)' },
       calendarCellSelected: { background: 'var(--dsw-alias-interactive-bg-hover)' },
+      // 把待办拖到某一天时，悬停那一格的提示
+      calendarCellDropTarget: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       calendarDot: { width: 4, height: 4, borderRadius: '50%', position: 'absolute', bottom: 2 },
       // Category list
       categoryList: { padding: '4px 12px' },
@@ -436,8 +440,12 @@ window.__ModuleLoader__.load({
       propertyChevron: { flex: 'none', display: 'flex', alignItems: 'center', color: 'var(--dsw-alias-label-tertiary)', marginLeft: 4 },
       saveBtn: { height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 13, cursor: 'pointer', fontWeight: 500 },
       saveBtnContainer: { display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 20px', flex: 'none' },
-      // 「保存范围」选择器：贴在底部按钮上方，三条路各一个按钮。
-      scopeSheet: { margin: '0 20px 12px', padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'var(--dsw-alias-bg-layer-1)', display: 'flex', flexDirection: 'column', gap: 6 },
+      // 拖动到小日历某天后的三选一（遮罩用通用 S.overlay，这里只留内部排版）
+      scopeDialogTitle: { fontSize: 14, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      scopeDialogHint: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 4 },
+      scopeDialogBtn: { height: 34, padding: '0 12px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, cursor: 'pointer', textAlign: 'left' },
+      scopeDialogCancel: { height: 28, padding: '0 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', alignSelf: 'flex-end' },
+      // 「保存范围」选择器：贴在底部按钮上方，三条路各一个按钮。      scopeSheet: { margin: '0 20px 12px', padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'var(--dsw-alias-bg-layer-1)', display: 'flex', flexDirection: 'column', gap: 6 },
       scopeTitle: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
       scopeHint: { fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 2 },
       scopeBtn: { height: 30, padding: '0 10px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 12, cursor: 'pointer', textAlign: 'left' },
@@ -2615,13 +2623,15 @@ window.__ModuleLoader__.load({
               : null)))
     }
 
-    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, uncategorizedCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay, statusFilter, onStatusChange, rangeMode, onRangeChange, width }) {
+    function LeftPanel({ t, activeFilter, onFilterChange, categories, inboxCount, uncategorizedCount, onCreateCategory, onInboxFilter, monthCursor, onMonthChange, calendarItems, onSelectDay, selectedDay, statusFilter, onStatusChange, rangeMode, onRangeChange, width, dragging, onDayDrop }) {
       // 「+ 新建分类」就地展开一行输入：不再打开旧的「管理分类」弹窗。
       const [creating, setCreating] = useState(false)
       const [draft, setDraft] = useState('')
       const [saving, setSaving] = useState(false)
       const [createError, setCreateError] = useState(null)
       const createWrapRef = useRef(null)
+      // 拖拽悬停在哪一格（只有正在拖待办时才可能非 null）
+      const [overDay, setOverDay] = useState(null)
       const cells = monthGrid(monthCursor.year, monthCursor.month)
       const monthKey = `${monthCursor.year}-${String(monthCursor.month + 1).padStart(2, '0')}`
       const todayKey = dateKeyOf(new Date())
@@ -2716,6 +2726,8 @@ window.__ModuleLoader__.load({
               const isToday = key === todayKey
               const isSelected = key === selectedDay
               const dotColor = items.length > 0 ? QUADRANT_COLORS[items[0].quadrant] ?? priorityColor(items[0].priority) : null
+              // 拖动待办时，每一格都是「改到这一天」的落点。
+              const isDropTarget = dragging === true && overDay === key
               return h('button', {
                 key,
                 type: 'button',
@@ -2725,9 +2737,21 @@ window.__ModuleLoader__.load({
                   ...S.calendarCell,
                   ...(isToday ? S.calendarCellToday : null),
                   ...(isSelected ? S.calendarCellSelected : null),
+                  ...(isDropTarget ? S.calendarCellDropTarget : null),
                   ...(inMonth ? null : { opacity: 0.4 }),
                 },
                 onClick: () => handleDayClick(key),
+                onDragOver: dragging === true
+                  ? (e) => { e.preventDefault(); if (overDay !== key) setOverDay(key) }
+                  : undefined,
+                onDragLeave: dragging === true ? () => { if (overDay === key) setOverDay(null) } : undefined,
+                onDrop: dragging === true
+                  ? (e) => {
+                      e.preventDefault()
+                      setOverDay(null)
+                      if (typeof onDayDrop === 'function') onDayDrop(key)
+                    }
+                  : undefined,
               },
               String(Number(key.slice(8, 10))),
               dotColor ? h('span', { style: { ...S.calendarDot, background: dotColor }, 'aria-hidden': 'true' }) : null)
@@ -2905,7 +2929,7 @@ window.__ModuleLoader__.load({
       }, dueLabel(item)))
     }
 
-    function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd, onMove }) {
+    function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd, onMove, dragging, onDragStartItem, onDragEndItem }) {
       const byQuadrant = useMemo(() => {
         const map = {}
         for (const q of QUADRANTS) map[q.key] = []
@@ -2916,14 +2940,12 @@ window.__ModuleLoader__.load({
         return map
       }, [items])
 
-      // 拖拽换象限：记的是「哪一条（哪一次）」，拖动中高亮落点卡片。
-      // 放下即保存（自动），所以不弹确认 —— 拖错了再拖回来就行。
-      const [dragging, setDragging] = useState(null)
+      // 拖拽状态由 TodoPage 持有（小日历也要当落点），这里只管「悬停在哪一格」。
       const [overQuadrant, setOverQuadrant] = useState(null)
+      const active = dragging ?? null
 
       const dropInto = (quadrant) => {
-        const from = dragging
-        setDragging(null)
+        const from = active
         setOverQuadrant(null)
         if (from === null || typeof onMove !== 'function') return
         // 本来就是这一格，没必要写库
@@ -2941,13 +2963,13 @@ window.__ModuleLoader__.load({
       return h('div', { style: S.matrixArea },
         QUADRANTS.map((q) => {
           const qItems = byQuadrant[q.key] ?? []
-          const isDropTarget = overQuadrant === q.key && dragging !== null
+          const isDropTarget = overQuadrant === q.key && active !== null
           return h('div', {
             key: q.key,
             style: isDropTarget ? { ...S.quadrantCard, ...S.quadrantCardDropTarget } : S.quadrantCard,
             className: 'td-quadrant-card',
             onDragOver: (e) => {
-              if (dragging === null) return
+              if (active === null) return
               // 不 preventDefault 就收不到 drop —— 浏览器默认禁止放置。
               e.preventDefault()
               if (overQuadrant !== q.key) setOverQuadrant(q.key)
@@ -2974,15 +2996,20 @@ window.__ModuleLoader__.load({
                 : qItems.map((item) => h(TodoRow, {
                     key: rowKeyOf(item), t, item, selectedId, onSelect, onToggle,
                     // 循环任务按「这一次」的身份日带走，否则拖完改到系列起点去了。
-                    onDragStart: () => setDragging({
-                      id: item.id,
-                      occurrenceDate: item.occurrenceDate ?? item.dueDate,
-                      isRepeating: Boolean(item.isRepeating),
-                      fromQuadrant: q.key,
-                    }),
-                    onDragEnd: () => { setDragging(null); setOverQuadrant(null) },
-                    dragging: dragging !== null && dragging.id === item.id
-                      && asText(dragging.occurrenceDate) === asText(item.occurrenceDate ?? item.dueDate),
+                    onDragStart: () => {
+                      if (typeof onDragStartItem === 'function') {
+                        onDragStartItem({
+                          id: item.id,
+                          occurrenceDate: item.occurrenceDate ?? item.dueDate,
+                          isRepeating: Boolean(item.isRepeating),
+                          fromQuadrant: q.key,
+                          title: asText(item.title),
+                        })
+                      }
+                    },
+                    onDragEnd: () => { if (typeof onDragEndItem === 'function') onDragEndItem() },
+                    dragging: active !== null && active.id === item.id
+                      && asText(active.occurrenceDate) === asText(item.occurrenceDate ?? item.dueDate),
                   }))))
         }))
     }
@@ -3889,6 +3916,11 @@ window.__ModuleLoader__.load({
       const [selected, setSelected] = useState(null)
       // 被点中的那次发生日（循环任务「仅本次」靠它认出是哪一次）。null = 没点具体实例。
       const [selectedOccurrence, setSelectedOccurrence] = useState(null)
+      // 正在被拖动的待办（矩阵换象限 / 拖到小日历改日期共用一份）。
+      // 放在 TodoPage 而不是 MatrixArea：小日历在左面板，也得当落点。
+      const [dragItem, setDragItem] = useState(null)
+      // 循环待办拖到某一天后待确认的三选一。
+      const [dropScope, setDropScope] = useState(null)
       const [dialog, setDialog] = useState(null)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
       // 迷你日历当前那份实例数据 + 它覆盖的范围。单日 / 当月的窗口直接复用它，
@@ -4223,6 +4255,43 @@ window.__ModuleLoader__.load({
         return mutate('update', { id: dragged.id, patch: { quadrant } })
       }, [mutate])
 
+      /**
+       * 拖到小日历的某一天：**只改日期，其余信息原样不动**。
+       *
+       * 普通待办直接落库；循环待办先问范围（仅本次 / 本次及未来 / 整个系列），
+       * 因为「把 11-13 这一次挪到 11-16」和「从这次起都改成 16 号」是两件事。
+       */
+      const handleDropOnDay = useCallback((dateKey) => {
+        const dragged = dragItem
+        setDragItem(null)
+        if (!dragged || !dragged.id) return
+        const from = asText(dragged.occurrenceDate) || asText(dragged.dueDate)
+        // 拖回原处：不写库
+        if (from !== '' && from === dateKey) return
+        if (!dragged.isRepeating) {
+          void mutate('update', { id: dragged.id, patch: { dueDate: dateKey } })
+          return
+        }
+        // 循环任务：弹三选一，选完才落库
+        setDropScope({ ...dragged, fromDate: from, targetDate: dateKey })
+      }, [dragItem, mutate])
+
+      /** 三选一确认后的落库（循环待办拖到某一天）。 */
+      const handleDropScope = useCallback(async (scope) => {
+        const pending = dropScope
+        setDropScope(null)
+        if (!pending) return false
+        const patch = { dueDate: pending.targetDate }
+        if (scope === 'this') {
+          return mutate('overrideOccurrence', { id: pending.id, date: pending.fromDate, patch })
+        }
+        if (scope === 'future') {
+          // 分界在**这一次**，新系列从拖到的日期开始
+          return mutate('splitSeries', { id: pending.id, from: pending.fromDate, patch })
+        }
+        return mutate('update', { id: pending.id, patch })
+      }, [dropScope, mutate])
+
       const handleAddToQuadrant = (quadrant) => {        // 在选中的那天上点「+」：默认日期就是那天，没选日（全部）时退回今天。
         // **不带 startTime / endTime** —— 新建的待办默认「全天」，时间由用户自己去加
         // （展开「时间」属性行、或切到时间段时才会补默认值）。
@@ -4392,6 +4461,9 @@ window.__ModuleLoader__.load({
           onToggle: handleToggle,
           onAdd: handleAddToQuadrant,
           onMove: handleMoveQuadrant,
+          dragging: dragItem,
+          onDragStartItem: setDragItem,
+          onDragEndItem: () => setDragItem(null),
         })
       }
 
@@ -4437,6 +4509,9 @@ window.__ModuleLoader__.load({
             onRangeChange: handleRangeChange,
             // 窄窗口把左面板收窄（日历 7 列本来就够用），把宽度让给矩阵。
             width: narrowViewport ? 320 : undefined,
+            // 拖动待办时，小日历每一格都能当「改到这一天」的落点。
+            dragging: dragItem !== null,
+            onDayDrop: handleDropOnDay,
           }),
           activeRailContent(),
           selectedItem
@@ -4498,6 +4573,43 @@ window.__ModuleLoader__.load({
               onSaved: () => setDialog(null),
               onCreateCategory: createCategory,
             })
+          : null,
+        // 循环待办拖到小日历某一天后的三选一。
+        // 覆盖层自带遮罩，点空白处 = 取消（什么都不存）。
+        dropScope !== null
+          ? h('div', {
+              className: 'td-overlay',
+              // 与其它弹窗同一套遮罩/层级，避免出现两套视觉
+              style: S.overlay,
+              role: 'dialog',
+              'aria-modal': 'true',
+              'aria-label': t('saveScopeTitle'),
+              onClick: (event) => { if (event.target === event.currentTarget) setDropScope(null) },
+            },
+            h('div', {
+              className: 'td-dialog',
+              style: { ...S.dialog, width: 360 },
+              onClick: (e) => { if (e && typeof e.stopPropagation === 'function') e.stopPropagation() },
+            },
+              h('div', { style: S.scopeDialogTitle }, t('saveScopeTitle')),
+              h('div', { style: S.scopeDialogHint },
+                String(t('dropScopeHint'))
+                  .replace('{from}', asText(dropScope.fromDate))
+                  .replace('{to}', asText(dropScope.targetDate))),
+              [['this', 'saveScopeThis'], ['future', 'saveScopeFuture'], ['all', 'saveScopeAll']].map(([scope, label]) =>
+                h('button', {
+                  key: scope,
+                  type: 'button',
+                  className: 'td-btn',
+                  style: S.scopeDialogBtn,
+                  onClick: () => void handleDropScope(scope),
+                }, t(label))),
+              h('button', {
+                type: 'button',
+                className: 'td-btn',
+                style: S.scopeDialogCancel,
+                onClick: () => setDropScope(null),
+              }, t('cancel'))))
           : null,
       )
     }

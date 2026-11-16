@@ -137,21 +137,26 @@ test('从「重要且紧急」拖到「不重要不紧急」→ 回调收到目�
   const h = load()
   h.reset()
   const moves = []
-  const props = {
+  // 拖动状态由父组件持有（小日历也要当落点），所以测试里自己扮演父组件。
+  let dragState = null
+  const makeProps = () => ({
     t: T,
     items: [row('a', 'urgent_important')],
     onSelect() {}, selectedId: null, onToggle() {}, onAdd() {},
     onMove: (dragged, quadrant) => { moves.push([dragged.id, dragged.occurrenceDate, dragged.fromQuadrant, quadrant]) },
-  }
-  // 第一遍：触发 dragStart，写入拖动状态
-  let tree = h.render(props)
+    dragging: dragState,
+    onDragStartItem: (d) => { dragState = d },
+    onDragEndItem: () => { dragState = null },
+  })
+  // 第一遍：触发 dragStart，父组件记下被拖的那条
+  let tree = h.render(makeProps())
   rowOf(tree, 'a').props.onDragStart(fakeEvent())
   // 第二遍：dragging 已就位，落点卡片才能收 drop
-  tree = h.render(props)
+  tree = h.render(makeProps())
   const target = cardOf(tree, '不重要不紧急')
   assert.ok(target, '找到目标象限卡片')
   target.props.onDragOver(fakeEvent())
-  tree = h.render(props)
+  tree = h.render(makeProps())
   cardOf(tree, '不重要不紧急').props.onDrop(fakeEvent())
   assert.deepEqual(moves, [['a', '2026-11-16', 'urgent_important', 'neither']])
 })
@@ -160,14 +165,18 @@ test('拖回原来那一格 → 不写库', () => {
   const h = load()
   h.reset()
   const moves = []
-  const props = {
+  let dragState = null
+  const makeProps = () => ({
     t: T, items: [row('a', 'urgent_important')],
     onSelect() {}, selectedId: null, onToggle() {}, onAdd() {},
     onMove: (d, q) => moves.push([d.id, q]),
-  }
-  let tree = h.render(props)
+    dragging: dragState,
+    onDragStartItem: (d) => { dragState = d },
+    onDragEndItem: () => { dragState = null },
+  })
+  let tree = h.render(makeProps())
   rowOf(tree, 'a').props.onDragStart(fakeEvent())
-  tree = h.render(props)
+  tree = h.render(makeProps())
   cardOf(tree, '重要且紧急').props.onDrop(fakeEvent())
   assert.deepEqual(moves, [], '原地放下不该产生写入')
 })
@@ -176,15 +185,19 @@ test('循环待办拖动时带走「这一次」的身份日', () => {
   const h = load()
   h.reset()
   const moves = []
+  let dragState = null
   const repeatRow = row('r', 'urgent_important', { isRepeating: true, dueDate: '2026-11-16', occurrenceDate: '2026-11-13' })
-  const props = {
+  const makeProps = () => ({
     t: T, items: [repeatRow],
     onSelect() {}, selectedId: null, onToggle() {}, onAdd() {},
     onMove: (d, q) => moves.push([d.id, d.occurrenceDate, d.isRepeating, q]),
-  }
-  let tree = h.render(props)
+    dragging: dragState,
+    onDragStartItem: (d) => { dragState = d },
+    onDragEndItem: () => { dragState = null },
+  })
+  let tree = h.render(makeProps())
   rowOf(tree, 'r').props.onDragStart(fakeEvent())
-  tree = h.render(props)
+  tree = h.render(makeProps())
   cardOf(tree, '重要不紧急').props.onDrop(fakeEvent())
   assert.deepEqual(moves, [['r', '2026-11-13', true, 'important_not_urgent']])
 })
