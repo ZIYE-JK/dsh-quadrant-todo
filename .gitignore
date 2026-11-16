@@ -1,3 +1,5 @@
 node_modules/
 *.tmp
 *.bak-*
+# 跑 node --test 时把 TEMP 指到仓库内的临时目录；沙箱里 TEMP 默认不可写
+.tmp-test/
