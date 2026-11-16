@@ -51,6 +51,7 @@ window.__ModuleLoader__.load({
         inbox: '收集箱', inboxPlaceholder: '添加计划到「收集箱」，回车即可保存',
         all: '全部', uncategorized: '无分类', newCategory: '新建分类',
         allCategories: '全部分类', statusAll: '全部', statusDone: '已完成', statusTodo: '待办',
+        backToMatrix: '← 返回四象限',
         rangeMonth: '当月', rangeYear: '当年',
         saveScopeTitle: '这条是重复待办，改哪里？',
         saveScopeHint: '以 {date} 这一次为基准',
@@ -158,6 +159,7 @@ window.__ModuleLoader__.load({
         inbox: 'Inbox', inboxPlaceholder: 'Add to Inbox, press Enter to save',
         all: 'All', uncategorized: 'No category', newCategory: 'New category',
         allCategories: 'All categories', statusAll: 'All', statusDone: 'Done', statusTodo: 'To do',
+        backToMatrix: '← Back to matrix',
         rangeMonth: 'Month', rangeYear: 'Year',
         saveScopeTitle: 'This is a repeating todo — what should change?',
         saveScopeHint: 'Relative to the {date} occurrence',
@@ -381,6 +383,8 @@ window.__ModuleLoader__.load({
       quadrantCard: { background: 'var(--dsw-specific-input-major)', borderRadius: 'var(--dsw-radius-lg)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', border: '0.5px solid var(--dsw-alias-border-l2)' },
       quadrantHead: { display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '0 16px', flex: 'none', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
       quadrantTitle: { fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+      // 收集箱那屏的「返回四象限」：贴着标题右侧，做成小号幽灵按钮。
+      backToMatrixBtn: { flex: 'none', height: 24, padding: '0 8px', marginRight: 4, borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' },
       quadrantAddBtn: { width: 28, height: 28, padding: 0, border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 18, color: 'var(--dsw-alias-label-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
       quadrantBody: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 12px 12px' },
       emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '40px 20px', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 },
@@ -2935,13 +2939,21 @@ window.__ModuleLoader__.load({
      * 收集箱：还没有象限的任务。矩阵按象限分组，这些任务在那里无处可去 ——
      * 少了这块，快捷添加建出来的任务在界面上根本看不见。
      */
-    function InboxArea({ t, items, onSelect, selectedId, onToggle, onAdd }) {
+    function InboxArea({ t, items, onSelect, selectedId, onToggle, onAdd, onBack }) {
       return h('div', { style: { ...S.matrixArea, gridTemplateColumns: '1fr', gridTemplateRows: '1fr' } },
         h('div', { style: S.quadrantCard, className: 'td-quadrant-card' },
           h('div', { style: S.quadrantHead },
             h('span', { style: { width: 4, height: 20, borderRadius: 2, background: 'var(--dsw-alias-label-tertiary)', flex: 'none' } }),
             h('span', { style: S.quadrantTitle }, t('inbox')),
             h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-tertiary)', marginRight: 8 } }, String(items.length)),
+            // 返回四象限：收集箱是单独一屏，进来以后没有别的路可回
+            // （左栏「做计划」只切 rail、不清筛选），所以这里必须给一个明确的出口。
+            h('button', {
+              type: 'button',
+              className: 'td-btn',
+              style: S.backToMatrixBtn,
+              onClick: () => { if (typeof onBack === 'function') onBack() },
+            }, t('backToMatrix')),
             h('button', {
               type: 'button',
               className: 'td-btn',
@@ -4305,6 +4317,7 @@ window.__ModuleLoader__.load({
             selectedId: selected,
             onToggle: handleToggle,
             onAdd: handleAddToQuadrant,
+            onBack: () => setActiveFilter('all'),
           })
         }
         // Default: plan (matrix)
@@ -4330,7 +4343,12 @@ window.__ModuleLoader__.load({
           h(LeftRail, {
             t,
             active: activeRail,
-            onChange: setActiveRail,
+            // 「做计划」= 回四象限：收集箱是筛选出来的单独一屏，
+            // 只切 rail 不清筛选的话，点了没有任何反应，看着像卡住。
+            onChange: (next) => {
+              setActiveRail(next)
+              if (next === 'plan' && activeFilter === '__inbox__') setActiveFilter('all')
+            },
             onAvatarClick: () => {},
           }),
           h(LeftPanel, {
