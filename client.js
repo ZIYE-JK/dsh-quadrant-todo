@@ -1197,6 +1197,27 @@ window.__ModuleLoader__.load({
       return out
     }
 
+    /** occurrences 的 items → Map<todoId, Map<date, info>>，窗口展开的输入。 */
+    function buildOccurrenceMap(items) {
+      const map = new Map()
+      for (const item of Array.isArray(items) ? items : []) {
+        let byDate = map.get(item.todoId)
+        if (!byDate) { byDate = new Map(); map.set(item.todoId, byDate) }
+        byDate.set(item.date, {
+          done: item.done === true,
+          occurrenceDate: item.occurrenceDate ?? item.date,
+          overridden: item.overridden === true,
+        })
+      }
+      return map
+    }
+
+    /** `outer` 这份实例数据是否覆盖了 `inner` 这个窗口。覆盖就不用再发请求。 */
+    function rangeCovers(outer, inner) {
+      if (outer === null || outer === undefined || inner === null || inner === undefined) return false
+      return outer.from <= inner.from && outer.to >= inner.to
+    }
+
     /** 完成状态筛选：全部 / 已完成 / 待办。 */
     function matchesStatus(row, statusFilter) {
       if (statusFilter === 'done') return row.done === true
@@ -3806,7 +3827,9 @@ window.__ModuleLoader__.load({
       const [selectedOccurrence, setSelectedOccurrence] = useState(null)
       const [dialog, setDialog] = useState(null)
       const [monthCursor, setMonthCursor] = useState(() => { const at = new Date(); return { year: at.getFullYear(), month: at.getMonth() } })
-      const [calendarItems, setCalendarItems] = useState([])
+      // 迷你日历当前那份实例数据 + 它覆盖的范围。单日 / 当月的窗口直接复用它，
+      // 不再发第二次请求 —— 否则每次点日期都会「先空一下、再填上」，看着在跳闪。
+      const [calendarData, setCalendarData] = useState(null)
       const [settings, setSettings] = useState({ notify: { system: true, feishu: true, leadMinutes: 0, overdueDaily: true, checkpoints: ['11:00', '16:00'], quietHours: { enabled: false, start: '22:00', end: '08:00' } } })
       const [noticeHidden, setNoticeHidden] = useState(corruptDismissed)
       const [actionError, setActionError] = useState(false)
@@ -3824,7 +3847,7 @@ window.__ModuleLoader__.load({
       // 窗口内的实例：Map<todoId, Map<date, done>>。数字、矩阵、收集箱都从它展开，
       // 所以同一份数据既算数字也出列表，条数天然恒等。
       // null = 还没拿到（此时退回按 dueDate 落在窗口内，避免数据闪没）。
-      const [windowOccurrence, setWindowOccurrence] = useState(null)
+      const [fetchedWindow, setFetchedWindow] = useState(null)
       const [retrying, setRetrying] = useState(false)
 
       const tRef = useRef(t)
@@ -3937,12 +3960,13 @@ window.__ModuleLoader__.load({
         fetchApi('occurrences', { from, to }, tRef.current)
           .then((result) => {
             if (!alive) return
-            setCalendarItems(Array.isArray(result?.items) ? result.items : [])
+            // 范围一起记下来：窗口（单日 / 当月）落在它里面时直接复用，省一次请求。
+            setCalendarData({ from, to, items: Array.isArray(result?.items) ? result.items : [] })
           })
           .catch((err) => {
             if (!alive) return
             console.error('[dsh-quadrant-todo] occurrences failed', err)
-            setCalendarItems([])
+            setCalendarData({ from, to, items: [] })
           })
         return () => { alive = false }
       }, [monthCursor, dataVersion])
@@ -3953,34 +3977,29 @@ window.__ModuleLoader__.load({
         [rangeMode, dayFilter, monthCursor.year, monthCursor.month],
       )
 
+      // 迷你日历那份数据覆盖了当前窗口吗？覆盖就直接用，连请求都不用发。
+      // 单日 / 当月都落在月历网格里，所以点日期不会出现空帧。
+      const coveredByCalendar = rangeCovers(calendarData, windowRange)
+      const windowKey = `${windowRange.from}|${windowRange.to}`
+
       // 窗口内的实例（矩阵 / 收集箱 / 分类计数都按它算）。
       useEffect(() => {
+        if (coveredByCalendar) return undefined
         let alive = true
         fetchApi('occurrences', { from: windowRange.from, to: windowRange.to }, tRef.current)
           .then((result) => {
             if (!alive) return
-            const map = new Map()
-            for (const item of Array.isArray(result?.items) ? result.items : []) {
-              let byDate = map.get(item.todoId)
-              if (!byDate) { byDate = new Map(); map.set(item.todoId, byDate) }
-              // 值不再是布尔，而是那次发生的全部信息：done / 原始日期 / 是否被单次覆盖。
-              byDate.set(item.date, {
-                done: item.done === true,
-                occurrenceDate: item.occurrenceDate ?? item.date,
-                overridden: item.overridden === true,
-              })
-            }
-            setWindowOccurrence(map)
+            setFetchedWindow({ key: windowKey, map: buildOccurrenceMap(result?.items) })
           })
           .catch((err) => {
             if (!alive) return
-            // 取不到就保持 null：退回按 dueDate 落在窗口内，宁可少显示循环任务，
-            // 也不要因为一次网络抖动把整屏清空。
+            // 取不到就把这份 key 标成「已就绪但没数据」：退回按 dueDate 落在窗口内，
+            // 宁可少显示循环任务，也不要卡在「永远加载中」。
             console.error('[dsh-quadrant-todo] window occurrences failed', err)
-            setWindowOccurrence(null)
+            setFetchedWindow({ key: windowKey, map: null })
           })
         return () => { alive = false }
-      }, [windowRange.from, windowRange.to, dataVersion])
+      }, [windowKey, dataVersion, coveredByCalendar])
 
       const handleMonthChange = (delta) => {
         if (delta === 0) {
@@ -4142,14 +4161,28 @@ window.__ModuleLoader__.load({
         })
       }
 
+      // 窗口数据就绪了吗：月历覆盖了就直接算；否则等那一次请求带着当前 key 回来。
+      // 未就绪时**继续显示上一帧的行**（见下面的 lastRows）—— 宁可多留十几毫秒旧内容，
+      // 也不要先清空再填满：那正是「点日期待办跳闪一下」的来源。
+      const occurrenceReady = coveredByCalendar
+        || (fetchedWindow !== null && fetchedWindow.key === windowKey)
+      const windowOccurrence = coveredByCalendar
+        ? buildOccurrenceMap(calendarData.items)
+        : (fetchedWindow !== null && fetchedWindow.key === windowKey ? fetchedWindow.map : null)
+
       // 矩阵 = 已归入象限的计划（**含已完成**），再叠加可选的按天筛选。
       // 排序走全局统一的 compareTodoOrder：未完成在上、全天在前、有时间的按开始时间、
       // 其余按创建日期 —— 与月视图 / 周视图全天带 / 统计清单同一套口径。
       // 展开规则见 expandRowsForWindow：同一任务在窗口内出现几次就是几行。
-      const windowRows = useMemo(() => {
+      const windowRowsFresh = useMemo(() => {
+        if (!occurrenceReady) return null
         const expanded = expandRowsForWindow(items, windowRange, windowOccurrence)
         return expanded.filter((row) => matchesStatus(row, statusFilter))
-      }, [items, windowRange, windowOccurrence, statusFilter])
+      }, [items, windowRange, windowOccurrence, statusFilter, occurrenceReady])
+      // 未就绪时沿用上一帧；首次加载（还没有上一帧）才真的空。
+      const lastRowsRef = useRef([])
+      if (windowRowsFresh !== null) lastRowsRef.current = windowRowsFresh
+      const windowRows = windowRowsFresh ?? lastRowsRef.current
 
       // 详情面板优先用**被点中的那一次实例**：循环任务同一条会有多行，
       // list() 给的是「本次周期那一次」，未必是用户点的。实例行还带着单次覆盖后的
@@ -4313,7 +4346,7 @@ window.__ModuleLoader__.load({
             onInboxFilter: handleInboxFilter,
             monthCursor,
             onMonthChange: handleMonthChange,
-            calendarItems,
+            calendarItems: calendarData === null ? [] : calendarData.items,
             onSelectDay: handleSelectDay,
             selectedDay: dayFilter,
             statusFilter,
