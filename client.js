@@ -381,6 +381,8 @@ window.__ModuleLoader__.load({
       // Matrix
       matrixArea: { flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 16, padding: 16, overflow: 'hidden' },
       quadrantCard: { background: 'var(--dsw-specific-input-major)', borderRadius: 'var(--dsw-radius-lg)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', border: '0.5px solid var(--dsw-alias-border-l2)' },
+      // 拖动待办悬停时的落点提示：整格描边 + 淡底，明确「松手就放这里」。
+      quadrantCardDropTarget: { border: '1.5px dashed var(--dsw-alias-state-business-primary)', background: 'var(--dsw-alias-bg-layer-2)' },
       quadrantHead: { display: 'flex', alignItems: 'center', gap: 8, height: 48, padding: '0 16px', flex: 'none', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
       quadrantTitle: { fontSize: 14, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
       // 收集箱那屏的「返回四象限」：贴着标题右侧，做成小号幽灵按钮。
@@ -2823,7 +2825,7 @@ window.__ModuleLoader__.load({
      * 一行待办。完成态 = 实心勾 + 删除线，并且**留在原处不消失** ——
      * 「完成即消失」让人无法确认自己到底做没做，也没法撤销误勾。
      */
-    function TodoRow({ t, item, selectedId, onSelect, onToggle }) {
+    function TodoRow({ t, item, selectedId, onSelect, onToggle, onDragStart, onDragEnd, dragging }) {
       const done = Boolean(item.done)
       const selected = item.id === selectedId
       // 循环任务以本周期实例为准：dueDate 为空说明系列已结束，
@@ -2834,10 +2836,22 @@ window.__ModuleLoader__.load({
       // 子计划进度（与详情面板同一口径）：矩阵行上也能直接看到 3/5。
       const subtaskTotal = Array.isArray(item.subtasks) ? item.subtasks.length : 0
       const subtaskDone = subtaskTotal === 0 ? 0 : item.subtasks.filter((s) => s.done === true).length
+      const draggable = typeof onDragStart === 'function'
       return h('div', {
         key: item.id,
         className: 'td-todo-row',
-        style: { ...(selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow), ...(given ? { opacity: 0.55 } : null) },
+        style: {
+          ...(selected ? { ...S.todoRow, ...S.todoRowSelected } : S.todoRow),
+          ...(given ? { opacity: 0.55 } : null),
+          ...(dragging ? { opacity: 0.4 } : null),
+          ...(draggable ? { cursor: 'grab' } : null),
+        },
+        // HTML5 拖拽：只有矩阵行给了 onDragStart 才可拖（收集箱那屏不拖）。
+        draggable: draggable ? true : undefined,
+        onDragStart: draggable
+          ? (e) => { try { e.dataTransfer.setData('text/plain', asText(item.id)) ; e.dataTransfer.effectAllowed = 'move' } catch { /* 老浏览器忽略 */ } onDragStart() }
+          : undefined,
+        onDragEnd: draggable && typeof onDragEnd === 'function' ? () => onDragEnd() : undefined,
         onClick: () => onSelect(item.id, item.occurrenceDate ?? item.dueDate),
       },
       checkHit(
@@ -2891,7 +2905,7 @@ window.__ModuleLoader__.load({
       }, dueLabel(item)))
     }
 
-    function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd }) {
+    function MatrixArea({ t, items, onSelect, selectedId, onToggle, onAdd, onMove }) {
       const byQuadrant = useMemo(() => {
         const map = {}
         for (const q of QUADRANTS) map[q.key] = []
@@ -2901,6 +2915,21 @@ window.__ModuleLoader__.load({
         }
         return map
       }, [items])
+
+      // 拖拽换象限：记的是「哪一条（哪一次）」，拖动中高亮落点卡片。
+      // 放下即保存（自动），所以不弹确认 —— 拖错了再拖回来就行。
+      const [dragging, setDragging] = useState(null)
+      const [overQuadrant, setOverQuadrant] = useState(null)
+
+      const dropInto = (quadrant) => {
+        const from = dragging
+        setDragging(null)
+        setOverQuadrant(null)
+        if (from === null || typeof onMove !== 'function') return
+        // 本来就是这一格，没必要写库
+        if (from.fromQuadrant === quadrant) return
+        onMove(from, quadrant)
+      }
 
       const emptyCaptions = {
         urgent_not_important: 'quadrantEmptyUrgentNotImportant',
@@ -2912,7 +2941,20 @@ window.__ModuleLoader__.load({
       return h('div', { style: S.matrixArea },
         QUADRANTS.map((q) => {
           const qItems = byQuadrant[q.key] ?? []
-          return h('div', { key: q.key, style: S.quadrantCard, className: 'td-quadrant-card' },
+          const isDropTarget = overQuadrant === q.key && dragging !== null
+          return h('div', {
+            key: q.key,
+            style: isDropTarget ? { ...S.quadrantCard, ...S.quadrantCardDropTarget } : S.quadrantCard,
+            className: 'td-quadrant-card',
+            onDragOver: (e) => {
+              if (dragging === null) return
+              // 不 preventDefault 就收不到 drop —— 浏览器默认禁止放置。
+              e.preventDefault()
+              if (overQuadrant !== q.key) setOverQuadrant(q.key)
+            },
+            onDragLeave: () => { if (overQuadrant === q.key) setOverQuadrant(null) },
+            onDrop: (e) => { e.preventDefault(); dropInto(q.key) },
+          },
             h('div', { style: S.quadrantHead },
               h('span', { style: { width: 4, height: 20, borderRadius: 2, background: q.color, flex: 'none' } }),
               h('span', { style: S.quadrantTitle }, t(q.labelKey)),
@@ -2931,6 +2973,16 @@ window.__ModuleLoader__.load({
                     h('span', null, t(emptyCaptions[q.key])))
                 : qItems.map((item) => h(TodoRow, {
                     key: rowKeyOf(item), t, item, selectedId, onSelect, onToggle,
+                    // 循环任务按「这一次」的身份日带走，否则拖完改到系列起点去了。
+                    onDragStart: () => setDragging({
+                      id: item.id,
+                      occurrenceDate: item.occurrenceDate ?? item.dueDate,
+                      isRepeating: Boolean(item.isRepeating),
+                      fromQuadrant: q.key,
+                    }),
+                    onDragEnd: () => { setDragging(null); setOverQuadrant(null) },
+                    dragging: dragging !== null && dragging.id === item.id
+                      && asText(dragging.occurrenceDate) === asText(item.occurrenceDate ?? item.dueDate),
                   }))))
         }))
     }
@@ -4159,8 +4211,19 @@ window.__ModuleLoader__.load({
       // 通知开关直接反映宿主持久化的设置，不再单独存一份本地状态（否则两者会漂移）。
       const notificationOn = Boolean(settings && settings.notify && settings.notify.system)
 
-      const handleAddToQuadrant = (quadrant) => {
-        // 在选中的那天上点「+」：默认日期就是那天，没选日（全部）时退回今天。
+      /**
+       * 拖动换象限：松手即保存，不弹确认。
+       *
+       * 循环待办拖的是「这一次」，但象限属于**系列级**字段 ——
+       * overrides 里没有 quadrant 之外的语义可言（仅本次改象限会让同一条任务
+       * 在不同月份躺进不同格子，反而更难找），所以统一改整条记录的象限。
+       */
+      const handleMoveQuadrant = useCallback((dragged, quadrant) => {
+        if (!dragged || !dragged.id || !quadrant) return Promise.resolve(false)
+        return mutate('update', { id: dragged.id, patch: { quadrant } })
+      }, [mutate])
+
+      const handleAddToQuadrant = (quadrant) => {        // 在选中的那天上点「+」：默认日期就是那天，没选日（全部）时退回今天。
         // **不带 startTime / endTime** —— 新建的待办默认「全天」，时间由用户自己去加
         // （展开「时间」属性行、或切到时间段时才会补默认值）。
         // 只影响**创建** —— 编辑走右侧详情面板，用的是已保存的值，不会被这里带跑。
@@ -4328,6 +4391,7 @@ window.__ModuleLoader__.load({
           selectedId: selected,
           onToggle: handleToggle,
           onAdd: handleAddToQuadrant,
+          onMove: handleMoveQuadrant,
         })
       }
 
