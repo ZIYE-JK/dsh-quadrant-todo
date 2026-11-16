@@ -55,10 +55,14 @@ window.__ModuleLoader__.load({
         rangeMonth: '当月', rangeYear: '当年',
         saveScopeTitle: '这条是重复待办，改哪里？',
         saveScopeHint: '以 {date} 这一次为基准',
-        saveScopeThis: '仅本次 — 只改这一次，其余按原规则',
-        saveScopeFuture: '本次及未来 — 从这一次起改用新设置',
-        saveScopeAll: '整个系列 — 所有这一次（含已过）',
+        saveScopeThis: '仅本次',
+        saveScopeThisDesc: '只改这一次，其余按原规则',
+        saveScopeFuture: '本次及未来',
+        saveScopeFutureDesc: '从这一次起改用新设置',
+        saveScopeAll: '整个系列',
+        saveScopeAllDesc: '所有这一次（含已过）',
         dropScopeHint: '把 {from} 这一次改到 {to}，其余信息不变',
+        scopeConfirm: '选择范围后才会保存',
         monthTitle: '{year}年{month}月', backToToday: '回到今天',
         quadrantUrgentImportant: '重要且紧急',
         quadrantUrgentNotImportant: '紧急不重要',
@@ -164,10 +168,14 @@ window.__ModuleLoader__.load({
         rangeMonth: 'Month', rangeYear: 'Year',
         saveScopeTitle: 'This is a repeating todo — what should change?',
         saveScopeHint: 'Relative to the {date} occurrence',
-        saveScopeThis: 'This one only — leave the rest on the old rule',
-        saveScopeFuture: 'This and future — use the new settings from here on',
-        saveScopeAll: 'The whole series — every occurrence',
+        saveScopeThis: 'This one only',
+        saveScopeThisDesc: 'Leave the rest on the old rule',
+        saveScopeFuture: 'This and future',
+        saveScopeFutureDesc: 'Use the new settings from here on',
+        saveScopeAll: 'The whole series',
+        saveScopeAllDesc: 'Every occurrence, past included',
         dropScopeHint: 'Move the {from} occurrence to {to}; everything else stays',
+        scopeConfirm: 'Nothing is saved until you pick a scope',
         monthTitle: '{year} {{month}}', backToToday: 'Back to today',
         quadrantUrgentImportant: 'Urgent & Important',
         quadrantUrgentNotImportant: 'Urgent & Not Important',
@@ -440,16 +448,20 @@ window.__ModuleLoader__.load({
       propertyChevron: { flex: 'none', display: 'flex', alignItems: 'center', color: 'var(--dsw-alias-label-tertiary)', marginLeft: 4 },
       saveBtn: { height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: 'var(--dsw-alias-state-business-primary)', color: 'var(--dsw-alias-label-primary-inverted)', fontSize: 13, cursor: 'pointer', fontWeight: 500 },
       saveBtnContainer: { display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 20px', flex: 'none' },
-      // 拖动到小日历某天后的三选一（遮罩用通用 S.overlay，这里只留内部排版）
-      scopeDialogTitle: { fontSize: 14, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
-      scopeDialogHint: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 4 },
-      scopeDialogBtn: { height: 34, padding: '0 12px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 13, cursor: 'pointer', textAlign: 'left' },
-      scopeDialogCancel: { height: 28, padding: '0 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', alignSelf: 'flex-end' },
-      // 「保存范围」选择器：贴在底部按钮上方，三条路各一个按钮。      scopeSheet: { margin: '0 20px 12px', padding: 12, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'var(--dsw-alias-bg-layer-1)', display: 'flex', flexDirection: 'column', gap: 6 },
+      // 「保存范围」的选项块（弹窗与面板底部共用同一套排版）
+      scopeOption: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', cursor: 'pointer', textAlign: 'left' },
+      scopeOptionLabel: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      scopeOptionDesc: { fontSize: 12, lineHeight: '17px', color: 'var(--dsw-alias-label-tertiary)' },
+      scopeOptionList: { display: 'flex', flexDirection: 'column', gap: 8 },
+      scopeDialogTitle: { fontSize: 15, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
+      scopeDialogHint: { fontSize: 12, lineHeight: '19px', color: 'var(--dsw-alias-label-tertiary)', margin: '6px 0 14px' },
+      scopeDialogFoot: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, gap: 12 },
+      scopeDialogNote: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' },
+      scopeDialogCancel: { flex: 'none', height: 30, padding: '0 14px', borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-secondary)', fontSize: 12, cursor: 'pointer' },
+      // 「保存范围」选择器：贴在底部按钮上方，三条路各一个按钮。      scopeSheet: { margin: '0 20px 12px', padding: 14, borderRadius: 8, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'var(--dsw-alias-bg-layer-1)', display: 'flex', flexDirection: 'column', gap: 8 },
       scopeTitle: { fontSize: 13, fontWeight: 600, color: 'var(--dsw-alias-label-primary)' },
-      scopeHint: { fontSize: 11, lineHeight: '16px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 2 },
-      scopeBtn: { height: 30, padding: '0 10px', borderRadius: 6, border: '0.5px solid var(--dsw-alias-border-l3)', background: 'transparent', color: 'var(--dsw-alias-label-primary)', fontSize: 12, cursor: 'pointer', textAlign: 'left' },
-      scopeCancel: { height: 26, padding: '0 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', textAlign: 'right' },
+      scopeHint: { fontSize: 11, lineHeight: '17px', color: 'var(--dsw-alias-label-tertiary)', marginBottom: 2 },
+      scopeCancel: { height: 26, padding: '0 10px', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, cursor: 'pointer', alignSelf: 'flex-end' },
       // Shared UI primitives
       overlay: { position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--dsw-alias-bg-mask-1)' },
       dialog: { width: 560, maxWidth: 'calc(100vw - 32px)', maxHeight: '82vh', overflowY: 'auto', boxSizing: 'border-box', padding: '22px 24px 18px', background: 'var(--dsw-specific-input-major)', borderRadius: 'var(--dsw-radius-xl)', boxShadow: 'var(--dsw-elevation-panel)', color: 'var(--dsw-alias-label-primary)' },
@@ -698,6 +710,12 @@ window.__ModuleLoader__.load({
 .td-property-row:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .td-subtask-delete { transition: color .12s ease; }
 .td-subtask-delete:hover { color: var(--dsw-alias-state-error-primary); }
+
+/* 「保存范围」的三个选项：整块可点，悬停给底 + 描边，别再挤成三行小按钮 */
+.td-scope-option { transition: background-color .12s ease, border-color .12s ease; }
+.td-scope-option:hover { background: var(--dsw-alias-interactive-bg-hover); border-color: var(--dsw-alias-state-business-primary); }
+.td-scope-option:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary); }
+.td-scope-option:disabled { opacity: .55; cursor: default; }
 
 /* 周视图的块/胶囊：键盘可达，但不能带 role=button（保持行内 checkbox 可读） */
 .td-week-item { transition: filter .12s ease; }
@@ -3046,6 +3064,29 @@ window.__ModuleLoader__.load({
               : items.map((item) => h(TodoRow, { key: rowKeyOf(item), t, item, selectedId, onSelect, onToggle })))))
     }
 
+    /**
+     * 「保存范围」的一个选项：整块可点，上行短标题、下行说明。
+     * 详情面板的底部选择器与「拖到某天」的弹窗共用同一个组件，口径不会漂。
+     */
+    const SCOPE_OPTIONS = [
+      ['this', 'saveScopeThis', 'saveScopeThisDesc'],
+      ['future', 'saveScopeFuture', 'saveScopeFutureDesc'],
+      ['all', 'saveScopeAll', 'saveScopeAllDesc'],
+    ]
+
+    function ScopeOption({ t, scope, labelKey, descKey, onPick, disabled }) {
+      return h('button', {
+        key: scope,
+        type: 'button',
+        className: 'td-btn td-scope-option',
+        style: S.scopeOption,
+        disabled: disabled === true,
+        onClick: () => onPick(scope),
+      },
+      h('span', { style: S.scopeOptionLabel }, t(labelKey)),
+      h('span', { style: S.scopeOptionDesc }, t(descKey)))
+    }
+
     /** Esc 关闭：弹窗自己挂 document 监听，避免每个组件抄一遍。 */
     function useEscapeKey(onClose, active) {
       const closeRef = useRef(onClose)
@@ -3539,15 +3580,13 @@ window.__ModuleLoader__.load({
             h('div', { style: S.scopeTitle }, t('saveScopeTitle')),
             h('div', { style: S.scopeHint },
               String(t('saveScopeHint')).replace('{date}', asText(item.occurrenceDate) || asText(item.dueDate))),
-            [['this', 'saveScopeThis'], ['future', 'saveScopeFuture'], ['all', 'saveScopeAll']].map(([scope, label]) =>
-              h('button', {
-                key: scope,
-                type: 'button',
-                className: 'td-btn',
-                style: S.scopeBtn,
-                disabled: saving,
-                onClick: () => void handleSave(scope),
-              }, t(label))),
+            h('div', { style: S.scopeOptionList },
+              SCOPE_OPTIONS.map(([scope, labelKey, descKey]) =>
+                h(ScopeOption, {
+                  key: scope, t, scope, labelKey, descKey,
+                  disabled: saving,
+                  onPick: (picked) => void handleSave(picked),
+                }))),
             h('button', {
               type: 'button',
               className: 'td-btn',
@@ -4588,7 +4627,7 @@ window.__ModuleLoader__.load({
             },
             h('div', {
               className: 'td-dialog',
-              style: { ...S.dialog, width: 360 },
+              style: { ...S.dialog, width: 400 },
               onClick: (e) => { if (e && typeof e.stopPropagation === 'function') e.stopPropagation() },
             },
               h('div', { style: S.scopeDialogTitle }, t('saveScopeTitle')),
@@ -4596,20 +4635,20 @@ window.__ModuleLoader__.load({
                 String(t('dropScopeHint'))
                   .replace('{from}', asText(dropScope.fromDate))
                   .replace('{to}', asText(dropScope.targetDate))),
-              [['this', 'saveScopeThis'], ['future', 'saveScopeFuture'], ['all', 'saveScopeAll']].map(([scope, label]) =>
+              h('div', { style: S.scopeOptionList },
+                SCOPE_OPTIONS.map(([scope, labelKey, descKey]) =>
+                  h(ScopeOption, {
+                    key: scope, t, scope, labelKey, descKey,
+                    onPick: (picked) => void handleDropScope(picked),
+                  }))),
+              h('div', { style: S.scopeDialogFoot },
+                h('span', { style: S.scopeDialogNote }, t('scopeConfirm')),
                 h('button', {
-                  key: scope,
                   type: 'button',
                   className: 'td-btn',
-                  style: S.scopeDialogBtn,
-                  onClick: () => void handleDropScope(scope),
-                }, t(label))),
-              h('button', {
-                type: 'button',
-                className: 'td-btn',
-                style: S.scopeDialogCancel,
-                onClick: () => setDropScope(null),
-              }, t('cancel'))))
+                  style: S.scopeDialogCancel,
+                  onClick: () => setDropScope(null),
+                }, t('cancel')))))
           : null,
       )
     }

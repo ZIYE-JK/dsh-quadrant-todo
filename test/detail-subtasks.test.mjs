@@ -24,9 +24,14 @@ function load() {
   const hookStore = []
   let hookIdx = 0
   const react = {
-    createElement: (type, props, ...children) => ({
-      type, props: props || {}, children: children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false),
-    }),
+    // 函数组件直接展开：选项块 ScopeOption 是组件，不展开就看不到它的文案。
+    // （只展开无 hook 的展示型组件，Icon / ScopeOption 都是。）
+    createElement: (type, props, ...children) => {
+      const kids = children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false)
+      const withKids = { ...(props || {}), children: kids }
+      if (typeof type === 'function') return type(withKids)
+      return { type, props: withKids, children: kids }
+    },
     useState(init) {
       const i = hookIdx++
       if (!(i in hookStore)) hookStore[i] = typeof init === 'function' ? init() : init
@@ -81,7 +86,9 @@ const BASE = {
     noSubtasks: '暂无子计划', add: '添加', subtaskPlaceholder: '输入子计划…', dismiss: '关闭',
     save: '保存', remove: '删除', cancel: '取消', loading: '保存中',
     saveScopeTitle: '这条是重复待办，改哪里？', saveScopeHint: '以 {date} 这一次为基准',
-    saveScopeThis: '仅本次', saveScopeFuture: '本次及未来', saveScopeAll: '整个系列',
+    saveScopeThis: '仅本次', saveScopeThisDesc: '只改这一次，其余按原规则',
+    saveScopeFuture: '本次及未来', saveScopeFutureDesc: '从这一次起改用新设置',
+    saveScopeAll: '整个系列', saveScopeAllDesc: '所有这一次（含已过）',
   }[k] ?? k),
   categories: [],
   onCreateCategory: async () => {},
@@ -241,7 +248,11 @@ test('选了「仅本次」→ 回调收到 scope=this 和这次的身份日', (
   saveBtnOf(tree).props.onClick()
   tree = h.render(props)
   let target = null
-  walk(tree, (n) => { if (!target && n.type === 'button' && textOf(n).trim() === '仅本次') target = n })
+  walk(tree, (n) => {
+    if (target || n.type !== 'button') return
+    // 选项现在是「标题 + 说明」两行，用前缀匹配标题那一行
+    if (textOf(n).trim().startsWith('仅本次')) target = n
+  })
   assert.ok(target, '找到「仅本次」按钮')
   target.props.onClick()
   return Promise.resolve().then(() => assert.deepEqual(calls, [['this', '2026-11-13']]))
