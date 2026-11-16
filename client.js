@@ -339,7 +339,6 @@ window.__ModuleLoader__.load({
       railItemActive: { background: 'var(--dsw-specific-input-major)', color: 'var(--dsw-alias-label-primary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
       railIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
       railLabel: { fontSize: 11, lineHeight: 1 },
-      railAvatar: { width: 32, height: 32, borderRadius: '50%', background: 'var(--dsw-alias-bg-module-platform)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginTop: 'auto', marginBottom: 12, color: 'var(--dsw-alias-label-tertiary)' },
       // Left panel
       leftPanel: { width: 369, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
       panelSection: { padding: '12px 16px', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
@@ -2410,7 +2409,7 @@ window.__ModuleLoader__.load({
       }, paths.map((d, i) => h('path', { key: i, d })))
     }
 
-    function LeftRail({ t, active, onChange, onAvatarClick }) {
+    function LeftRail({ t, active, onChange }) {
       const items = [
         { key: 'plan', labelKey: 'plan', icon: 'plan' },
         { key: 'view', labelKey: 'view', icon: 'calendar' },
@@ -2428,8 +2427,7 @@ window.__ModuleLoader__.load({
           onClick: () => onChange(item.key),
         },
         h('span', { style: S.railIcon }, h(Icon, { name: item.icon, size: 18 })),
-        h('span', { style: S.railLabel }, t(item.labelKey)))),
-        h('div', { style: S.railAvatar, onClick: onAvatarClick }, '😼'))
+        h('span', { style: S.railLabel }, t(item.labelKey)))))
     }
 
     function TopBar({ t, onQuickAdd, notificationOn, settings, onSettingsChange }) {
@@ -4524,7 +4522,6 @@ window.__ModuleLoader__.load({
               setActiveRail(next)
               if (next === 'plan' && activeFilter === '__inbox__') setActiveFilter('all')
             },
-            onAvatarClick: () => {},
           }),
           h(LeftPanel, {
             t,
