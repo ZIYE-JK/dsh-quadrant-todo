@@ -52,6 +52,8 @@ window.__ModuleLoader__.load({
         all: '全部', uncategorized: '无分类', newCategory: '新建分类',
         allCategories: '全部分类', statusAll: '全部', statusDone: '已完成', statusTodo: '待办',
         backToMatrix: '← 返回四象限',
+        hideLeftPanel: '隐藏左栏',
+        showLeftPanel: '显示左栏',
         rangeMonth: '当月', rangeYear: '当年',
         saveScopeTitle: '这条是重复待办，改哪里？',
         saveScopeHint: '以 {date} 这一次为基准',
@@ -165,6 +167,8 @@ window.__ModuleLoader__.load({
         all: 'All', uncategorized: 'No category', newCategory: 'New category',
         allCategories: 'All categories', statusAll: 'All', statusDone: 'Done', statusTodo: 'To do',
         backToMatrix: '← Back to matrix',
+        hideLeftPanel: 'Hide left panel',
+        showLeftPanel: 'Show left panel',
         rangeMonth: 'Month', rangeYear: 'Year',
         saveScopeTitle: 'This is a repeating todo — what should change?',
         saveScopeHint: 'Relative to the {date} occurrence',
@@ -340,6 +344,11 @@ window.__ModuleLoader__.load({
       railIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
       railLabel: { fontSize: 11, lineHeight: 1 },
       // Left panel
+      // 左栏把手：常驻左边缘的窄条；隐藏后点击可展开，拖动待办时变成宽感应区
+      leftHandle: { width: 14, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--dsw-alias-label-tertiary)', background: 'transparent', borderRight: '0.5px solid var(--dsw-alias-border-l2)', transition: 'background-color .12s ease' },
+      leftHandleCollapsed: { width: 14, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--dsw-alias-label-secondary)', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', transition: 'background-color .12s ease' },
+      // 拖动待办且左栏隐藏时：加宽成好命中的感应区，虚线提示「拖进来会展开日历」
+      leftHandleDropZone: { width: 56, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--dsw-alias-state-business-primary)', background: 'var(--dsw-alias-bg-layer-2)', borderRight: '1.5px dashed var(--dsw-alias-state-business-primary)', transition: 'width .12s ease' },
       leftPanel: { width: 369, flex: 'none', background: 'var(--dsw-alias-bg-layer-1)', borderRight: '0.5px solid var(--dsw-alias-border-l2)', display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: 'auto' },
       panelSection: { padding: '12px 16px', borderBottom: '0.5px solid var(--dsw-alias-border-l2)' },
       // Calendar mini
@@ -3085,6 +3094,37 @@ window.__ModuleLoader__.load({
       h('span', { style: S.scopeOptionDesc }, t(descKey)))
     }
 
+    /**
+     * 左栏把手：常驻在左边缘的一条窄带。
+     *
+     * - 点击 = 隐藏 / 取消隐藏左栏（默认不隐藏）
+     * - **隐藏后拖动待办**时，它加宽成感应区；鼠标一进来就回调 onPeek 把日历探出来，
+     *   这样不用为了拖一次日期先把整栏打开
+     * - 探出来的状态由父组件在「放下 / 拖动结束」时收回
+     */
+    function LeftHandle({ t, hidden, dragging, onToggle, onPeek }) {
+      const isDropZone = dragging === true && hidden === true
+      return h('div', {
+        className: 'td-left-handle',
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': hidden ? t('showLeftPanel') : t('hideLeftPanel'),
+        title: hidden ? t('showLeftPanel') : t('hideLeftPanel'),
+        'data-drop-zone': isDropZone ? 'true' : 'false',
+        style: isDropZone ? S.leftHandleDropZone : (hidden ? S.leftHandleCollapsed : S.leftHandle),
+        onClick: () => onToggle(),
+        onKeyDown: (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() }
+        },
+        onDragOver: (e) => {
+          if (dragging !== true || hidden !== true) return
+          // 必须 preventDefault，否则浏览器不认这里是可放置区
+          e.preventDefault()
+          onPeek()
+        },
+      }, h(Icon, { name: hidden ? 'chevronRight' : 'chevronLeft', size: 14 }))
+    }
+
     /** Esc 关闭：弹窗自己挂 document 监听，避免每个组件抄一遍。 */
     function useEscapeKey(onClose, active) {
       const closeRef = useRef(onClose)
@@ -3956,6 +3996,11 @@ window.__ModuleLoader__.load({
       // 正在被拖动的待办（矩阵换象限 / 拖到小日历改日期共用一份）。
       // 放在 TodoPage 而不是 MatrixArea：小日历在左面板，也得当落点。
       const [dragItem, setDragItem] = useState(null)
+      // 左栏隐藏：**默认不隐藏**。隐藏后拖动待办、鼠标移进左侧那条把手会自动「探头」
+      // 把日历露出来，放下之后恢复隐藏 —— 不用为了拖一次日期就把整栏打开。
+      const [leftHidden, setLeftHidden] = useState(false)
+      const [leftPeek, setLeftPeek] = useState(false)
+      const leftVisible = !leftHidden || leftPeek
       // 循环待办拖到某一天后待确认的三选一。
       const [dropScope, setDropScope] = useState(null)
       const [dialog, setDialog] = useState(null)
@@ -4301,6 +4346,8 @@ window.__ModuleLoader__.load({
       const handleDropOnDay = useCallback((dateKey) => {
         const dragged = dragItem
         setDragItem(null)
+        // 探头是为了这一次拖动，放完就收回去（原本没隐藏的话 leftPeek 本来就是 false）
+        setLeftPeek(false)
         if (!dragged || !dragged.id) return
         const from = asText(dragged.occurrenceDate) || asText(dragged.dueDate)
         // 拖回原处：不写库
@@ -4500,7 +4547,7 @@ window.__ModuleLoader__.load({
           onMove: handleMoveQuadrant,
           dragging: dragItem,
           onDragStartItem: setDragItem,
-          onDragEndItem: () => setDragItem(null),
+          onDragEndItem: () => { setDragItem(null); setLeftPeek(false) },
         })
       }
 
@@ -4523,7 +4570,16 @@ window.__ModuleLoader__.load({
               if (next === 'plan' && activeFilter === '__inbox__') setActiveFilter('all')
             },
           }),
-          h(LeftPanel, {
+          // 左栏的把手：点击隐藏 / 取消隐藏；拖动待办时鼠标进来会自动把日历探出来。
+          h(LeftHandle, {
+            t,
+            hidden: leftHidden,
+            dragging: dragItem !== null,
+            onToggle: () => { setLeftHidden((v) => !v); setLeftPeek(false) },
+            onPeek: () => { if (leftHidden && !leftPeek) setLeftPeek(true) },
+          }),
+          leftVisible
+            ? h(LeftPanel, {
             t,
             activeFilter,
             // 分类和窗口是**正交**的两个维度：点分类不再清掉 dayFilter，
@@ -4548,7 +4604,8 @@ window.__ModuleLoader__.load({
             // 拖动待办时，小日历每一格都能当「改到这一天」的落点。
             dragging: dragItem !== null,
             onDayDrop: handleDropOnDay,
-          }),
+          })
+            : null,
           activeRailContent(),
           selectedItem
             ? h(DetailPanel, {
