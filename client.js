@@ -361,6 +361,10 @@ window.__ModuleLoader__.load({
       calendarCell: { height: 30, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: 4, fontSize: 11, color: 'var(--dsw-alias-label-primary)', position: 'relative', padding: 0 },
       calendarCellToday: { fontWeight: 600, color: 'var(--dsw-alias-state-business-primary)' },
       calendarCellSelected: { background: 'var(--dsw-alias-interactive-bg-hover)' },
+      // 月视图里被拖动待办悬停的那一格
+      calendarViewCellDrop: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
+      // 周视图里被拖动待办悬停的那一列
+      weekColDrop: { background: 'color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent)' },
       // 把待办拖到某一天时，悬停那一格的提示
       calendarCellDropTarget: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       calendarDot: { width: 4, height: 4, borderRadius: '50%', position: 'absolute', bottom: 2 },
@@ -1258,6 +1262,31 @@ window.__ModuleLoader__.load({
       return outer.from <= inner.from && outer.to >= inner.to
     }
 
+    /**
+     * 把「某一天」变成拖拽落点所需的 props。
+     *
+     * 小日历、月视图、周视图三处都有「拖到某一天改日期」，判定和 preventDefault
+     * 的顺序要是错了会静默失效（浏览器直接不允许放置），所以统一从这里取。
+     * 没在拖动时返回空 props —— 不拖的时候这些格子不该抢事件。
+     */
+    function dayDropHandlers({ dragging, day, overDay, setOverDay, onDropDay }) {
+      if (dragging !== true) return { isOver: false, onDragOver: undefined, onDragLeave: undefined, onDrop: undefined }
+      return {
+        isOver: overDay === day,
+        onDragOver: (e) => {
+          // 不 preventDefault 就收不到 drop —— 浏览器默认禁止放置。
+          e.preventDefault()
+          if (overDay !== day) setOverDay(day)
+        },
+        onDragLeave: () => { if (overDay === day) setOverDay(null) },
+        onDrop: (e) => {
+          e.preventDefault()
+          setOverDay(null)
+          if (typeof onDropDay === 'function') onDropDay(day)
+        },
+      }
+    }
+
     /** 完成状态筛选：全部 / 已完成 / 待办。 */
     function matchesStatus(row, statusFilter) {
       if (statusFilter === 'done') return row.done === true
@@ -1941,7 +1970,7 @@ window.__ModuleLoader__.load({
                 })))))
     }
 
-    function CalendarView({ t, selectedDay, onPickDay, version, onSelect, selectedId, monthCursor, onMonthChange }) {
+    function CalendarView({ t, selectedDay, onPickDay, version, onSelect, selectedId, monthCursor, onMonthChange, dragging, onDragStartItem, onDragEndItem, onDropDay }) {
       // 月份状态**由父组件持有**，主月视图不再自己存一份。以前两边各存一份
       // （主视图 cursor / 左栏 monthCursor），翻主视图时左栏迷你日历纹丝不动，
       // 于是「左边有红点、右边没任务」这种看起来像 bug 的现象其实是两个月份。
@@ -1950,6 +1979,8 @@ window.__ModuleLoader__.load({
         return { year: at.getFullYear(), month: at.getMonth() }
       })()
       const [byDate, setByDate] = useState({})
+      // 拖动待办时悬停在哪一格（月视图自己当落点）
+      const [overDay, setOverDay] = useState(null)
 
       const cells = monthGrid(cursor.year, cursor.month)
       const from = cells[0]
@@ -2011,6 +2042,8 @@ window.__ModuleLoader__.load({
             const items = byDate[key] ?? []
             const inMonth = key.slice(0, 7) === monthKey
             const selected = key === selectedDay
+            // 拖待办时这一格就是「改到这一天」的落点
+            const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
             return h('div', {
               key,
               role: 'button',
@@ -2018,9 +2051,11 @@ window.__ModuleLoader__.load({
               className: 'td-btn td-cal-cell',
               'aria-label': key,
               'data-date': key,
+              'data-drop-target': drop.isOver ? 'true' : 'false',
               style: {
                 ...S.calendarViewCell,
                 ...(selected ? S.calendarCellSelected : null),
+                ...(drop.isOver ? S.calendarViewCellDrop : null),
                 ...(inMonth ? null : S.pickerDayOff),
               },
               onClick: () => onPickDay(key),
@@ -2029,6 +2064,9 @@ window.__ModuleLoader__.load({
                 event.preventDefault?.()
                 onPickDay(key)
               },
+              onDragOver: drop.onDragOver,
+              onDragLeave: drop.onDragLeave,
+              onDrop: drop.onDrop,
             },
             h('div', { style: key === todayKey ? { ...S.calendarViewDay, ...S.calendarCellToday } : S.calendarViewDay }, String(Number(key.slice(8, 10)))),
             // 这里不再 slice(0, 2)、也不再有 +N：当天所有待办都渲染，
@@ -2045,6 +2083,24 @@ window.__ModuleLoader__.load({
                   // 原生 title 兜一下：单元格很窄，省略号之外还能悬停看全名。
                   title: asText(item.title),
                   'aria-label': asText(item.title),
+                  // 拖到别的格子 = 改日期（循环任务会弹三选一，和拖到小日历同一套语义）。
+                  // 用身份日（occurrenceDate）当身份，被挪过期的实例才认得出来。
+                  draggable: true,
+                  onDragStart: (event) => {
+                    try {
+                      event.dataTransfer.setData('text/plain', asText(item.todoId))
+                      event.dataTransfer.effectAllowed = 'move'
+                    } catch (err) { /* 老浏览器忽略 */ }
+                    if (typeof onDragStartItem === 'function') {
+                      onDragStartItem({
+                        id: item.todoId,
+                        occurrenceDate: item.occurrenceDate ?? item.date,
+                        isRepeating: Boolean(item.repeat),
+                        title: asText(item.title),
+                      })
+                    }
+                  },
+                  onDragEnd: () => { if (typeof onDragEndItem === 'function') onDragEndItem() },
                   // 点胶囊 = 打开右侧编辑面板。**必须挡住冒泡**，
                   // 否则外层单元格会同时把它当成「选中这一天」。
                   onClick: (event) => {
@@ -2055,6 +2111,7 @@ window.__ModuleLoader__.load({
                   style: {
                     ...S.calendarViewItem,
                     ...S.calendarViewItemBtn,
+                    cursor: 'grab',
                     // 与周视图全天带同源：26% 的象限底色 + 实色左边，
                     // 这样在应用的半透明面板上也读得清。
                     background: `color-mix(in srgb, ${accent} 26%, transparent)`,
@@ -2080,10 +2137,12 @@ window.__ModuleLoader__.load({
      * 表头两行用 position: sticky 吸顶。这样 7 列与左侧时间轴天然对齐，
      * 不会因为滚动条宽度差出十几像素。
      */
-    function WeekView({ t, onSelect, onReschedule, version }) {
+    function WeekView({ t, onSelect, onReschedule, version, dragging, onDragStartItem, onDragEndItem, onDropDay }) {
       const [mondayKey, setMondayKey] = useState(() => mondayOfKey(dateKeyOf(new Date())))
       const [items, setItems] = useState([])
       const scrollRef = useRef(null)
+      // 拖动待办时悬停在哪一列（周视图自己当落点）
+      const [overDay, setOverDay] = useState(null)
 
       const weekDays = weekDayKeys(mondayKey)
       const from = weekDays[0]
@@ -2313,7 +2372,15 @@ window.__ModuleLoader__.load({
           // 全天带（重复任务 + 无时间块的任务）
           h('div', { style: S.weekAllDayRow },
             h('div', { style: S.weekAllDayLabel }, t('allDay')),
-            weekDays.map((key) => h('div', { key, style: S.weekAllDayCol },
+            weekDays.map((key) => {
+              const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
+              return h('div', {
+                key,
+                style: drop.isOver ? { ...S.weekAllDayCol, ...S.weekColDrop } : S.weekAllDayCol,
+                onDragOver: drop.onDragOver,
+                onDragLeave: drop.onDragLeave,
+                onDrop: drop.onDrop,
+              },
               (allDayByDate[key] ?? []).map((item) => {
                 const accent = accentOf(item)
                 return h('div', {
@@ -2321,8 +2388,26 @@ window.__ModuleLoader__.load({
                   className: 'td-week-item',
                   tabIndex: 0,
                   'aria-label': asText(item.title),
+                  // 拖到另一列 = 改到那一天（时间字段原样不动；循环任务会弹三选一）
+                  draggable: true,
+                  onDragStart: (event) => {
+                    try {
+                      event.dataTransfer.setData('text/plain', asText(item.todoId))
+                      event.dataTransfer.effectAllowed = 'move'
+                    } catch (err) { /* 老浏览器忽略 */ }
+                    if (typeof onDragStartItem === 'function') {
+                      onDragStartItem({
+                        id: item.todoId,
+                        occurrenceDate: item.occurrenceDate ?? item.date,
+                        isRepeating: Boolean(item.repeat),
+                        title: asText(item.title),
+                      })
+                    }
+                  },
+                  onDragEnd: () => { if (typeof onDragEndItem === 'function') onDragEndItem() },
                   style: {
                     ...S.weekChip,
+                    cursor: 'grab',
                     background: `color-mix(in srgb, ${accent} 26%, transparent)`,
                     borderLeft: `3px solid ${accent}`,
                     opacity: item.done ? 0.55 : 1,
@@ -2331,7 +2416,8 @@ window.__ModuleLoader__.load({
                   onClick: () => openItem(item),
                   onKeyDown: keyHandler(item),
                 }, asText(item.title))
-              })))),
+              }))
+            })),
 
           // 分时网格
           h('div', { style: S.weekGrid },
@@ -2340,12 +2426,18 @@ window.__ModuleLoader__.load({
             weekDays.map((key) => {
               const layout = layoutDayBlocks(timedByDate[key] ?? [])
               const isToday = key === todayKey
+              // 整列也是落点：把待办拖到某一天的分时列上，只改日期、时间不动。
+              const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
               return h('div', {
                 key,
                 style: {
                   ...S.weekDayStrip,
+                  ...(drop.isOver ? S.weekColDrop : null),
                   backgroundImage: `repeating-linear-gradient(to bottom, var(--dsw-alias-border-l2) 0, var(--dsw-alias-border-l2) 0.5px, transparent 0.5px, transparent ${HOUR_PX}px)`,
                 },
+                onDragOver: drop.onDragOver,
+                onDragLeave: drop.onDragLeave,
+                onDrop: drop.onDrop,
               },
               layout.blocks.map((block) => {
                 const item = block.item
@@ -2751,8 +2843,8 @@ window.__ModuleLoader__.load({
               const isToday = key === todayKey
               const isSelected = key === selectedDay
               const dotColor = items.length > 0 ? QUADRANT_COLORS[items[0].quadrant] ?? priorityColor(items[0].priority) : null
-              // 拖动待办时，每一格都是「改到这一天」的落点。
-              const isDropTarget = dragging === true && overDay === key
+              // 拖动待办时，每一格都是「改到这一天」的落点（与月视图 / 周视图同一套判定）。
+              const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay: onDayDrop })
               return h('button', {
                 key,
                 type: 'button',
@@ -2762,21 +2854,13 @@ window.__ModuleLoader__.load({
                   ...S.calendarCell,
                   ...(isToday ? S.calendarCellToday : null),
                   ...(isSelected ? S.calendarCellSelected : null),
-                  ...(isDropTarget ? S.calendarCellDropTarget : null),
+                  ...(drop.isOver ? S.calendarCellDropTarget : null),
                   ...(inMonth ? null : { opacity: 0.4 }),
                 },
                 onClick: () => handleDayClick(key),
-                onDragOver: dragging === true
-                  ? (e) => { e.preventDefault(); if (overDay !== key) setOverDay(key) }
-                  : undefined,
-                onDragLeave: dragging === true ? () => { if (overDay === key) setOverDay(null) } : undefined,
-                onDrop: dragging === true
-                  ? (e) => {
-                      e.preventDefault()
-                      setOverDay(null)
-                      if (typeof onDayDrop === 'function') onDayDrop(key)
-                    }
-                  : undefined,
+                onDragOver: drop.onDragOver,
+                onDragLeave: drop.onDragLeave,
+                onDrop: drop.onDrop,
               },
               String(Number(key.slice(8, 10))),
               dotColor ? h('span', { style: { ...S.calendarDot, background: dotColor }, 'aria-hidden': 'true' }) : null)
@@ -4494,6 +4578,11 @@ window.__ModuleLoader__.load({
             // 左栏会跟着变，两处永远不会指向不同的月份。
             monthCursor,
             onMonthChange: handleMonthChange,
+            // 月视图里也能把待办拖到别的日期（落点仍是同一天语义）
+            dragging: dragItem !== null,
+            onDragStartItem: setDragItem,
+            onDragEndItem: () => { setDragItem(null); setLeftPeek(false) },
+            onDropDay: handleDropOnDay,
           })
         }
         // 专注 = 周视图（7 天 × 0-24 时段）
@@ -4503,6 +4592,11 @@ window.__ModuleLoader__.load({
             onSelect: handleSelect,
             onReschedule: handleReschedule,
             version: dataVersion,
+            // 周视图：拖到另一列 = 改到那一天
+            dragging: dragItem !== null,
+            onDragStartItem: setDragItem,
+            onDragEndItem: () => { setDragItem(null); setLeftPeek(false) },
+            onDropDay: handleDropOnDay,
           })
         }
         // 统计 = 独立一屏：本周 / 本月各一列（环形图 + 未完成清单）
