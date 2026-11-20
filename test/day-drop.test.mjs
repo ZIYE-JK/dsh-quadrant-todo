@@ -225,5 +225,7 @@ test('周视图落点高亮只用长属性，不用 background 简写', () => {
   // 于是拖过一次的那一列刻度线永久消失。
   assert.equal('background' in style, false, '不能用 background 简写')
   assert.equal('backgroundImage' in style, false, '不能碰 backgroundImage')
-  assert.ok(style.backgroundColor, '底色要用 backgroundColor 长属性')
+  // 观感：落点提示是虚线描边（和象限卡片 / 日历格子同一套），不整列铺底色
+  assert.match(String(style.outline), /dashed/, '落点用虚线描边')
+  assert.equal('backgroundColor' in style, false, '不铺整列底色')
 })

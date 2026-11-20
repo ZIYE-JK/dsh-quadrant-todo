@@ -364,11 +364,14 @@ window.__ModuleLoader__.load({
       // 月视图里被拖动待办悬停的那一格
       calendarViewCellDrop: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       // 周视图里被拖动待办悬停的那一列
-      // 拖动待办悬停的那一列：**只用长属性**。
-      // 千万不能用 `background` 简写 —— 它会把同一元素上的 `backgroundImage`
-      // （周视图的整点横线就是靠它画的）一起重置；而 React 认为 backgroundImage
-      // 的值没变不会再设回去，于是那一列的刻度线就永久消失了。
-      weekColDrop: { backgroundColor: 'color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent)', boxShadow: 'inset 0 0 0 1.5px var(--dsw-alias-state-business-primary)' },
+      // 拖动待办悬停的那一列：**虚线描边**，与象限卡片 / 日历格子的落点提示同一套观感。
+      // 不用整列铺底色（太抢眼，会把时间块和刻度线压掉）。
+      // 也绝不能用 `background` 简写 —— 它会重置同一元素上的 `backgroundImage`
+      // （周视图的整点横线就是靠它画的），而 React 认为 backgroundImage 没变不再设回去，
+      // 于是那一列的刻度线会永久消失。
+      weekColDrop: { outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-1.5px' },
+      // 全天带的落点：只要一圈虚线，不铺底色
+      weekAllDayColDrop: { outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-1.5px' },
       // 把待办拖到某一天时，悬停那一格的提示
       calendarCellDropTarget: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       calendarDot: { width: 4, height: 4, borderRadius: '50%', position: 'absolute', bottom: 2 },
@@ -2405,8 +2408,9 @@ window.__ModuleLoader__.load({
               const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
               return h('div', {
                 key,
-                'data-week-day': key,
-                style: drop.isOver ? { ...S.weekAllDayCol, ...S.weekColDrop } : S.weekAllDayCol,
+                // 故意**不挂** data-week-day：时间段块横向拖动时的命中测试只认分时列，
+                // 否则拖时间块会把全天带也点亮成落点，既没意义又难看。
+                style: drop.isOver ? { ...S.weekAllDayCol, ...S.weekAllDayColDrop } : S.weekAllDayCol,
                 onDragOver: drop.onDragOver,
                 onDragLeave: drop.onDragLeave,
                 onDrop: drop.onDrop,
