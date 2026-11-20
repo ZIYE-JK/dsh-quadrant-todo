@@ -21,7 +21,7 @@ function load() {
   let src = fs.readFileSync(SRC, 'utf8')
   const marker = /return \{\r?\n\s*inject:/
   assert.ok(marker.test(src), 'factory return not found')
-  src = src.replace(marker, 'globalThis.__EXPOSED__ = { dayDropHandlers, CalendarView, WeekView };\r\n    return {\r\n      inject:')
+  src = src.replace(marker, 'globalThis.__EXPOSED__ = { dayDropHandlers, CalendarView, WeekView, S };\r\n    return {\r\n      inject:')
 
   const hookStore = []
   let hookIdx = 0
@@ -214,4 +214,16 @@ test('周视图：没在拖动时一个落点都不占', () => {
   h.reset()
   const tree = h.renderWeek(weekProps({ dragging: false }))
   assert.equal(countDropTargets(tree), 0)
+})
+// --- 4. 回归守卫：落点高亮不能毁掉周视图的整点横线 ---
+
+test('周视图落点高亮只用长属性，不用 background 简写', () => {
+  const h = load()
+  const style = h.S.weekColDrop
+  // 真实事故：用 background 简写会顺手把同一元素上的 backgroundImage
+  // （整点横线）重置成 none；React 又认为 backgroundImage 没变、不再设回去，
+  // 于是拖过一次的那一列刻度线永久消失。
+  assert.equal('background' in style, false, '不能用 background 简写')
+  assert.equal('backgroundImage' in style, false, '不能碰 backgroundImage')
+  assert.ok(style.backgroundColor, '底色要用 backgroundColor 长属性')
 })

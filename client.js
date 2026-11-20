@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
         timeRange: '时间段', timeStart: '开始', timeEnd: '结束',
         timeRangeInvalid: '结束时间必须晚于开始时间',
         // 周视图拖拽：块整体拖动 / 拖底边改时长 / 方向键等价操作
-        rescheduleHint: '拖动可调整时间，拖底部边缘可改时长（每次 30 分钟）',
+        rescheduleHint: '上下拖改时间、左右拖可换到另一天，拖底部边缘改时长（每次 30 分钟）',
         resizeHint: '拖动调整时长',
         // --- v4: 时间单一化 / 完成期限 / 超期处理 / 重复 ---
         timePoint: '时间点', propertyTime: '时间',
@@ -223,7 +223,7 @@ window.__ModuleLoader__.load({
         timeRange: 'Time range', timeStart: 'Start', timeEnd: 'End',
         timeRangeInvalid: 'End time must be after start time',
         // Week view drag: move the block / drag the bottom edge to resize / arrow keys
-        rescheduleHint: 'Drag to move, drag the bottom edge to resize (30-minute steps)',
+        rescheduleHint: 'Drag up/down to change the time, sideways to move it to another day, the bottom edge to resize (30-minute steps)',
         resizeHint: 'Drag to resize',
         // --- v4: single time source / due presets / overdue handling / repeat ---
         timePoint: 'Time point', propertyTime: 'Time',
@@ -364,7 +364,11 @@ window.__ModuleLoader__.load({
       // 月视图里被拖动待办悬停的那一格
       calendarViewCellDrop: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       // 周视图里被拖动待办悬停的那一列
-      weekColDrop: { background: 'color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent)' },
+      // 拖动待办悬停的那一列：**只用长属性**。
+      // 千万不能用 `background` 简写 —— 它会把同一元素上的 `backgroundImage`
+      // （周视图的整点横线就是靠它画的）一起重置；而 React 认为 backgroundImage
+      // 的值没变不会再设回去，于是那一列的刻度线就永久消失了。
+      weekColDrop: { backgroundColor: 'color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, transparent)', boxShadow: 'inset 0 0 0 1.5px var(--dsw-alias-state-business-primary)' },
       // 把待办拖到某一天时，悬停那一格的提示
       calendarCellDropTarget: { background: 'var(--dsw-alias-bg-layer-2)', outline: '1.5px dashed var(--dsw-alias-state-business-primary)', outlineOffset: '-2px' },
       calendarDot: { width: 4, height: 4, borderRadius: '50%', position: 'absolute', bottom: 2 },
@@ -2214,6 +2218,8 @@ window.__ModuleLoader__.load({
       // 关键点：拖动期间冻结「原始时间」，免得 2.5s 轮询回来的旧数据把块拽回去。
       const dragRef = useRef(null)
       const [dragState, setDragState] = useState(null)
+      // 指针拖动时间块时，横向落到的目标日（用于高亮那一列；HTML5 拖拽另有一套 overDay）
+      const [pointerDay, setPointerDay] = useState(null)
       const [frozenTimes, setFrozenTimes] = useState(() => new Map())
       const frozenRef = useRef(new Map())
       // 刚拖完的那一下 pointerup 之后浏览器还会补一个 click；用它挡掉「拖完又选中」。
@@ -2228,7 +2234,7 @@ window.__ModuleLoader__.load({
         setFrozenTimes(frozenRef.current)
       }, [items, version])
 
-      const beginDrag = (item, mode) => (event) => {
+      const beginDrag = (item, mode, day) => (event) => {
         if (event.button !== undefined && event.button !== 0) return
         // 缩放条是时间块的**子元素**。pointerdown 先命中子元素再冒泡到父块，
         // 父块挂的是 move 处理器——不拦住冒泡，mode 会立刻被改回 'move'，
@@ -2250,6 +2256,10 @@ window.__ModuleLoader__.load({
           mode,
           pointerId: event.pointerId,
           startY: event.clientY,
+          // 横向拖动 = 换一天：记下起点 x 和原始那一天
+          startX: event.clientX,
+          day: asText(day) || null,
+          targetDay: null,
           active: false,
           base,
           preview: null,
@@ -2262,9 +2272,22 @@ window.__ModuleLoader__.load({
         const drag = dragRef.current
         if (drag === null || event.pointerId !== drag.pointerId) return
         const dy = event.clientY - drag.startY
+        const dx = event.clientX - drag.startX
         if (!drag.active) {
-          if (Math.abs(dy) < DRAG_SLOP_PX) return
+          // 横向也要能起手：只上下滑才判阈值的话，「往左拖到另一天」根本不会激活。
+          if (Math.abs(dy) < DRAG_SLOP_PX && Math.abs(dx) < DRAG_SLOP_PX) return
           drag.active = true
+        }
+        // 横向 = 换天：用命中测试找当前指针底下是哪一列。
+        // 列上挂了 data-week-day，这样不依赖像素宽度估算，缩放/自适应都不会算错。
+        const el = typeof document !== 'undefined' && typeof document.elementFromPoint === 'function'
+          ? document.elementFromPoint(event.clientX, event.clientY)
+          : null
+        const col = el !== null && typeof el.closest === 'function' ? el.closest('[data-week-day]') : null
+        const targetDay = col !== null ? col.getAttribute('data-week-day') : null
+        if (targetDay !== null && targetDay !== drag.targetDay) {
+          drag.targetDay = targetDay
+          setPointerDay(targetDay)
         }
         const next = rescheduleTimes(drag.base, drag.mode, snapMinutes(dy))
         drag.preview = next
@@ -2275,6 +2298,7 @@ window.__ModuleLoader__.load({
         const drag = dragRef.current
         dragRef.current = null
         setDragState(null)
+        setPointerDay(null)
         return drag
       }
 
@@ -2285,11 +2309,16 @@ window.__ModuleLoader__.load({
         if (!drag.active) return
         // 真拖过：挡掉浏览器补发的那一下 click，避免「拖完又选中」。
         suppressClickRef.current = true
-        if (drag.preview === null || typeof onReschedule !== 'function') return
+        if (typeof onReschedule !== 'function') return
+        // 竖向拖动算出的时间 + 横向拖动落到的日期；只有真的换了天/换了时间才提交。
+        const next = drag.preview === null ? {} : { ...drag.preview }
+        const movedDay = drag.targetDay !== null && drag.targetDay !== drag.day
+        if (movedDay) next.dueDate = drag.targetDay
+        if (Object.keys(next).length === 0) return
         // 先解冻，等这次更新的新数据回来（mutate 会 reload + 抬 version）。
         frozenRef.current.delete(drag.id)
         setFrozenTimes(new Map(frozenRef.current))
-        Promise.resolve(onReschedule(drag.item, drag.preview)).catch((err) => {
+        Promise.resolve(onReschedule(drag.item, next)).catch((err) => {
           console.error('[dsh-quadrant-todo] reschedule failed', err)
         })
       }
@@ -2306,8 +2335,8 @@ window.__ModuleLoader__.load({
         openItem(item)
       }
 
-      const blockPointerHandlers = (item, mode) => ({
-        onPointerDown: beginDrag(item, mode),
+      const blockPointerHandlers = (item, mode, day) => ({
+        onPointerDown: beginDrag(item, mode, day),
         onPointerMove: moveDrag,
         onPointerUp: commitDrag,
         onPointerCancel: cancelDrag,
@@ -2376,6 +2405,7 @@ window.__ModuleLoader__.load({
               const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
               return h('div', {
                 key,
+                'data-week-day': key,
                 style: drop.isOver ? { ...S.weekAllDayCol, ...S.weekColDrop } : S.weekAllDayCol,
                 onDragOver: drop.onDragOver,
                 onDragLeave: drop.onDragLeave,
@@ -2428,11 +2458,15 @@ window.__ModuleLoader__.load({
               const isToday = key === todayKey
               // 整列也是落点：把待办拖到某一天的分时列上，只改日期、时间不动。
               const drop = dayDropHandlers({ dragging, day: key, overDay, setOverDay, onDropDay })
+              // 指针拖动时间块时横向落到的那一列也要高亮
+              const pointerOver = pointerDay === key
               return h('div', {
                 key,
+                // 命中测试用：横向拖时间块时靠它认出「指针底下是哪一天」
+                'data-week-day': key,
                 style: {
                   ...S.weekDayStrip,
-                  ...(drop.isOver ? S.weekColDrop : null),
+                  ...(drop.isOver || pointerOver ? S.weekColDrop : null),
                   backgroundImage: `repeating-linear-gradient(to bottom, var(--dsw-alias-border-l2) 0, var(--dsw-alias-border-l2) 0.5px, transparent 0.5px, transparent ${HOUR_PX}px)`,
                 },
                 onDragOver: drop.onDragOver,
@@ -2473,7 +2507,7 @@ window.__ModuleLoader__.load({
                   },
                   onClick: () => handleBlockClick(item),
                   onKeyDown: blockKeyHandler(item),
-                  ...blockPointerHandlers(item, 'move'),
+                  ...blockPointerHandlers(item, 'move', key),
                 },
                 h('span', {
                   style: {
@@ -2487,7 +2521,7 @@ window.__ModuleLoader__.load({
                   'aria-hidden': 'true',
                   title: t('resizeHint'),
                   style: S.weekResize,
-                  ...blockPointerHandlers(item, 'resize'),
+                  ...blockPointerHandlers(item, 'resize', key),
                 }))
               }),
               isToday
@@ -4335,6 +4369,8 @@ window.__ModuleLoader__.load({
         const patch = {}
         if (typeof next.startTime === 'string') patch.startTime = next.startTime
         if ('endTime' in next) patch.endTime = next.endTime === null ? null : asText(next.endTime)
+        // 周视图里横向拖动时间块 = 换一天（时间保留），所以也要能改日期。
+        if (typeof next.dueDate === 'string' && next.dueDate !== '') patch.dueDate = next.dueDate
         if (Object.keys(patch).length === 0) return Promise.resolve(false)
         return mutate('update', { id, patch })
       }, [mutate])
